@@ -1,0 +1,57 @@
+﻿# -- Secrets ------------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# -- Python -------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / build
+*.egg-info/
+build/
+*.egg
+*.whl
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Linting / type checking
+.ruff_cache/
+.mypy_cache/
+
+# SQLite databases (runtime data, not source)
+*.db
+*.sqlite
+*.sqlite3
+
+# -- Node / Frontend ----------------------------------------------------------
+node_modules/
+dist/
+.cache/
+frontend/dist/
+frontend/.vite/
+
+# -- IDEs / OS ----------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
