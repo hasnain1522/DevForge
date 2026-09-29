@@ -1,18 +1,9 @@
 """
 MissionBuilderAgent — converts a RepositorySnapshot into prioritized engineering Missions.
-
-The LLM receives the actual snapshot metrics and issues.
-All generated missions are validated against MissionSpec via Pydantic.
-
-IMPORTANT:
-- estimated_effort and expected_impact are informational display text only.
-- estimated_manual_minutes does NOT exist.
-- No dependency graphs are generated.
-- No execution orchestration happens here.
-- If the LLM fails, a clear LLMError is raised — no fabricated missions.
 """
 import json
 import logging
+from pathlib import Path
 
 from pydantic import BaseModel, field_validator
 
@@ -28,22 +19,15 @@ VALID_PRIORITIES = frozenset({"critical", "high", "medium", "low"})
 VALID_EFFORTS = frozenset({"minutes", "hours", "half_day"})
 
 
-# ---------------------------------------------------------------------------
-# Pydantic schema for LLM response validation
-# ---------------------------------------------------------------------------
-
 class MissionSpec(BaseModel):
-    """
-    Schema for a single mission returned by the LLM.
-    Used to validate the LLM response before persisting.
-    """
+    """Schema for a single mission returned by the LLM."""
     title: str
     problem: str
     mission_type: str
     affected_files: list[str]
     priority: str
-    estimated_effort: str  # informational only
-    expected_impact: str   # informational only
+    estimated_effort: str
+    expected_impact: str
     verification_requirements: list[str]
 
     @field_validator("mission_type")
@@ -56,16 +40,12 @@ class MissionSpec(BaseModel):
     @field_validator("priority")
     @classmethod
     def validate_priority(cls, v: str) -> str:
-        if v not in VALID_PRIORITIES:
-            return "medium"  # safe fallback for borderline cases
-        return v
+        return v if v in VALID_PRIORITIES else "medium"
 
     @field_validator("estimated_effort")
     @classmethod
     def validate_effort(cls, v: str) -> str:
-        if v not in VALID_EFFORTS:
-            return "hours"  # safe fallback
-        return v
+        return v if v in VALID_EFFORTS else "hours"
 
     @field_validator("affected_files")
     @classmethod
@@ -80,23 +60,11 @@ class MissionsResponse(BaseModel):
     missions: list[MissionSpec]
 
 
-# ---------------------------------------------------------------------------
-# Priority sort order
-# ---------------------------------------------------------------------------
-
 _PRIORITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
-# ---------------------------------------------------------------------------
-# Agent
-# ---------------------------------------------------------------------------
-
 class MissionBuilderAgent(BaseAgent):
-    """
-    Generates prioritized engineering Missions from a RepositorySnapshot.
-
-    Phase 2 implementation.
-    """
+    """Generates prioritized engineering Missions from a RepositorySnapshot."""
 
     name = "mission_builder"
 
@@ -105,89 +73,75 @@ class MissionBuilderAgent(BaseAgent):
         self.llm = llm
 
     async def run(self, context: dict) -> dict:
-        """
-        Generate missions from the snapshot in context["snapshot"].
-
-        context must contain:
-            snapshot: dict  — the RepositorySnapshot field dict
-
-        Returns:
-            {"missions": list[dict]}  — each dict matches MissionSpec fields.
-
-        Raises:
-            LLMError if the LLM fails after retries.
-            ValueError if the snapshot is missing required fields.
-        """
+        """Generate missions from the snapshot in context['snapshot'].""" 
         snapshot = context.get("snapshot")
         if not snapshot:
             raise ValueError("context must contain 'snapshot'")
 
         missions_raw = await self._generate(snapshot)
-
-        # Sort by priority
         missions_raw.sort(key=lambda m: _PRIORITY_ORDER.get(m["priority"], 99))
-
         return {"missions": missions_raw}
 
     async def _generate(self, snapshot: dict) -> list[dict]:
-        """Call the LLM and validate the response. Returns a list of mission dicts."""
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(snapshot)
-
+        """Call the LLM, validate missions, and normalize test-coverage targets."""
         try:
             result = await self.llm.call_json(
-                system_prompt, user_prompt, response_model=MissionsResponse
+                self._build_system_prompt(),
+                self._build_user_prompt(snapshot),
+                response_model=MissionsResponse,
             )
         except LLMError:
             raise
         except Exception as exc:
             raise LLMError(f"Unexpected error during mission generation: {exc}") from exc
 
-        missions_response = result  # type: MissionsResponse
-        if not isinstance(missions_response, MissionsResponse):
-            # call_json without response_model returns a dict; shouldn't happen here
+        if not isinstance(result, MissionsResponse):
             raise LLMError("LLM response did not validate as MissionsResponse")
 
         validated: list[dict] = []
-        for spec in missions_response.missions:
-            # Additional guard: skip if affected_files is somehow empty
+        for spec in result.missions:
             if not spec.affected_files:
                 logger.warning("Skipping mission '%s': no affected_files", spec.title)
                 continue
-            validated.append(spec.model_dump())
+            mission = spec.model_dump()
+            if mission["mission_type"] == "test_coverage":
+                mission["affected_files"] = self._test_targets(mission["affected_files"])
+            validated.append(mission)
 
-        # Cap at 10 missions
-        validated = validated[:10]
+        return validated[:10]
 
-        self.logger.info("Generated %d missions", len(validated))
-        return validated
-
-    # ── Prompt construction ─────────────────────────────────────────────────
+    @staticmethod
+    def _test_targets(files: list[str]) -> list[str]:
+        """Map source modules to test files; test missions may create these files."""
+        targets: list[str] = []
+        for value in files:
+            path = Path(value)
+            normalized = str(path).replace("\\", "/")
+            if path.suffix.lower() != ".py":
+                continue
+            if path.name.startswith("test_") or path.name.endswith("_test.py"):
+                target = normalized
+            else:
+                target = f"tests/test_{path.stem}.py"
+            if target not in targets:
+                targets.append(target)
+        return targets or files
 
     def _build_system_prompt(self) -> str:
         return (
             "You are a senior software engineer performing a code quality review. "
-            "Given metrics from a Python repository, generate a prioritized list of "
-            "actionable engineering missions.\n\n"
+            "Given metrics from a Python repository, generate a prioritized list of actionable engineering missions.\n\n"
             "Each mission must address a real, specific problem visible in the metrics.\n"
-            "Each mission must reference at least one plausible file path from the repository.\n\n"
+            "For test_coverage missions, affected_files are SOURCE modules that need tests; "
+            "DevForge will convert them into tests/test_<module>.py targets.\n\n"
             "Respond ONLY with valid JSON matching this exact schema:\n"
-            '{"missions": [\n'
-            '  {\n'
-            '    "title": "Short mission title",\n'
-            '    "problem": "Specific description of what is wrong",\n'
-            '    "mission_type": "test_coverage|bug_fix|documentation|refactor|dependency_update",\n'
-            '    "affected_files": ["path/to/file.py"],\n'
-            '    "priority": "critical|high|medium|low",\n'
-            '    "estimated_effort": "minutes|hours|half_day",\n'
-            '    "expected_impact": "Short description of improvement",\n'
-            '    "verification_requirements": ["tests pass", "ruff clean"]\n'
-            '  }\n'
-            "]}\n\n"
-            "Generate 3–8 missions. "
-            "If test coverage is below 30%, include at least one test_coverage mission. "
-            "Do not include estimated_manual_minutes. "
-            "Do not generate dependency graphs."
+            '{"missions": [{"title":"Short mission title","problem":"Specific problem",'
+            '"mission_type":"test_coverage|bug_fix|documentation|refactor|dependency_update",'
+            '"affected_files":["path/to/file.py"],"priority":"critical|high|medium|low",'
+            '"estimated_effort":"minutes|hours|half_day","expected_impact":"Short description",'
+            '"verification_requirements":["tests pass","ruff clean"]}]}\n\n'
+            "Generate 3–8 missions. If test coverage is below 30%, include at least one test_coverage mission. "
+            "Do not include estimated_manual_minutes. Do not generate dependency graphs."
         )
 
     def _build_user_prompt(self, snapshot: dict) -> str:
@@ -203,8 +157,9 @@ class MissionBuilderAgent(BaseAgent):
         except (json.JSONDecodeError, TypeError):
             pass
 
-        test_pct = (
-            round(snapshot.get("test_file_count", 0) / max(snapshot.get("file_count", 1), 1) * 100, 1)
+        test_pct = round(
+            snapshot.get("test_file_count", 0) / max(snapshot.get("file_count", 1), 1) * 100,
+            1,
         )
 
         return (
