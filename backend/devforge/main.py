@@ -3,9 +3,12 @@ DevForge — FastAPI application entry point.
 """
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from devforge.api import analyze, auth, evidence, execute, executions, missions, report, verify
 from devforge.config import settings
@@ -16,6 +19,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -35,7 +41,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow the Vite dev server (port 5173) and any localhost origin
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -48,7 +53,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register API routers
 app.include_router(analyze.router)
 app.include_router(analyze.repositories_router)
 app.include_router(auth.router)
@@ -64,3 +68,17 @@ app.include_router(report.router)
 async def health() -> dict:
     """Health check — returns 200 when the application is running."""
     return {"status": "ok", "app": settings.app_name}
+
+
+if FRONTEND_DIST.exists():
+    assets_dir = FRONTEND_DIST / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def frontend(path: str):
+        """Serve the built React app and support browser-router refreshes."""
+        requested = FRONTEND_DIST / path
+        if path and requested.is_file():
+            return FileResponse(requested)
+        return FileResponse(FRONTEND_DIST / "index.html")
