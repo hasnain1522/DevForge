@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { listExecutions, listRepositories } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import type { Repository } from '../types'
@@ -8,7 +8,6 @@ type ExecutionSummary = { id: string; mission_title: string; status: string; sta
 
 export default function Overview() {
   const { user } = useAuth()
-  const location = useLocation()
   const [repositories, setRepositories] = useState<Repository[]>([])
   const [executions, setExecutions] = useState<ExecutionSummary[]>([])
   const [error, setError] = useState('')
