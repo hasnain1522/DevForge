@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { listExecutions, listRepositories } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import type { Repository } from '../types'
@@ -8,22 +8,25 @@ type ExecutionSummary = { id: string; mission_title: string; status: string; sta
 
 export default function Overview() {
   const { user } = useAuth()
+  const location = useLocation()
   const [repositories, setRepositories] = useState<Repository[]>([])
   const [executions, setExecutions] = useState<ExecutionSummary[]>([])
   const [error, setError] = useState('')
 
+  const justRegistered = sessionStorage.getItem('devforge_just_registered') === '1'
   useEffect(() => {
+    if (justRegistered) sessionStorage.removeItem('devforge_just_registered')
     Promise.all([listRepositories(), listExecutions()])
       .then(([repos, runs]) => { setRepositories(repos); setExecutions(runs) })
       .catch(err => setError(err instanceof Error ? err.message : 'Could not load workspace'))
-  }, [])
+  }, [justRegistered])
 
   return (
     <section className="devforge-reveal">
       <div className="rounded-3xl border border-cyan-300/10 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/40 p-7 text-white shadow-xl sm:p-9">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Command center</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Welcome back{user?.email ? ', ' + user.email.split('@')[0] : ''}.</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">DevForge is ready. Analyze a repository, turn the evidence into engineering missions, and follow every change through verification.</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{justRegistered ? 'Welcome.' : 'Welcome back' + (user?.email ? ', ' + user.email.split('@')[0] : '') + '.'}</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">{justRegistered ? 'Your DevForge workspace is ready. Start by analyzing a repository and turn the findings into engineering missions.' : 'DevForge is ready. Analyze a repository, turn the evidence into engineering missions, and follow every change through verification.'}</p>
         <div className="mt-6 flex flex-wrap gap-3"><Link to="/analyze" className="rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-200">Analyze repository →</Link><Link to="/missions" className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white transition hover:bg-white/10">Open missions</Link></div>
       </div>
       {error && <p role="alert" className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
