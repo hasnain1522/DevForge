@@ -1,9 +1,11 @@
 """LLM backed, mission-scoped source file implementer."""
 import difflib
+import ast
 import hashlib
 from pathlib import Path
 
 from devforge.agents.base import BaseAgent
+from devforge.utils.llm import LLMError
 
 EDITABLE_SUFFIXES = {".py", ".toml", ".txt", ".yaml", ".yml", ".json"}
 
@@ -15,6 +17,49 @@ class ImplementerAgent(BaseAgent):
         super().__init__()
         self.llm = llm
         self.emit = emit
+
+    @staticmethod
+    def _local_test_fallback(root: Path, relative: str) -> str:
+        """Create executable pytest smoke tests when the LLM provider is unavailable."""
+        source_name = Path(relative).name
+        source_path = root / source_name
+        if not source_path.is_file():
+            raise ValueError("target_missing_or_outside_repository")
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        functions = [
+            node.name for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and not node.name.startswith("_")
+        ]
+        classes = [
+            node.name for node in tree.body
+            if isinstance(node, ast.ClassDef) and not node.name.startswith("_")
+        ]
+        module = source_path.stem
+        lines = [
+            '"""Local fallback tests generated when the configured LLM is unavailable."""',
+            "",
+            "import importlib",
+            "",
+            "",
+            "MODULE = importlib.import_module(" + repr(module) + ")",
+            "",
+        ]
+        for name in functions:
+            lines.extend([
+                "def test_" + name + "_is_available():",
+                "    assert callable(getattr(MODULE, " + repr(name) + "))",
+                "",
+            ])
+        for name in classes:
+            lines.extend([
+                "def test_" + name + "_is_available():",
+                "    assert isinstance(getattr(MODULE, " + repr(name) + "), type)",
+                "",
+            ])
+        if not functions and not classes:
+            lines.extend(["def test_module_imports():", "    assert MODULE is not None", ""])
+        return "\n".join(lines) + "\n"
 
     async def run(self, context: dict) -> dict:
         root = Path(context["repo_path"]).resolve()
@@ -53,11 +98,18 @@ class ImplementerAgent(BaseAgent):
                         " This is a new pytest file. Create focused tests for the referenced repository module; "
                         "do not place test code into production modules."
                     )
-                text = await self.llm.call_text(
-                    system_prompt,
-                    f"Mission: {context['title']}\nProblem: {context['problem']}\n"
-                    f"Repository relative path: {relative}\nCurrent file:\n{original}",
-                )
+                used_local_fallback = False
+                try:
+                    text = await self.llm.call_text(
+                        system_prompt,
+                        f"Mission: {context['title']}\nProblem: {context['problem']}\n"
+                        f"Repository relative path: {relative}\nCurrent file:\n{original}",
+                    )
+                except LLMError:
+                    if not is_new_test:
+                        raise
+                    text = self._local_test_fallback(root, relative)
+                    used_local_fallback = True
                 text = text.strip()
                 if text.startswith("```") or not text or text == original.strip():
                     raise ValueError("no_usable_changed_content")
@@ -75,7 +127,11 @@ class ImplementerAgent(BaseAgent):
                     "lines_added": sum(1 for line in diff if line.startswith("+") and not line.startswith("+++")),
                     "lines_deleted": sum(1 for line in diff if line.startswith("-") and not line.startswith("---")),
                 }
-                event_message = ("Created new test file from LLM output" if is_new_test and not original else "Updated file from LLM output")
+                event_message = (
+                    "Created executable local fallback tests"
+                    if used_local_fallback
+                    else ("Created new test file from LLM output" if is_new_test and not original else "Updated file from LLM output")
+                )
                 await self.emit("implementer", completed_event, event_message, str(relative))
                 return str(relative), None
             except Exception as exc:  # noqa: BLE001 - turn per-file errors into persisted checkpoints
