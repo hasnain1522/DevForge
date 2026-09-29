@@ -108,7 +108,77 @@ class MissionBuilderAgent(BaseAgent):
                 mission["affected_files"] = self._test_targets(mission["affected_files"])
             validated.append(mission)
 
+        if not validated:
+            logger.info("LLM returned no missions; generating deterministic missions from objective metrics")
+            validated = self._fallback_missions(snapshot)
+
         return validated[:10]
+
+    @staticmethod
+    def _fallback_missions(snapshot: dict) -> list[dict]:
+        """Generate actionable missions when the LLM returns an empty list."""
+        python_files = [
+            str(path).replace("\\", "/")
+            for path in snapshot.get("python_files", [])
+            if str(path).lower().endswith(".py")
+            and not Path(str(path)).name.startswith("test_")
+            and not str(path).replace("\\", "/").startswith("tests/")
+        ]
+        missions: list[dict] = []
+
+        if int(snapshot.get("test_function_count", 0) or 0) == 0:
+            source_files = python_files[:3] or ["README.md"]
+            missions.append({
+                "title": "Create executable test coverage",
+                "problem": "The repository has no executable test functions, so regression behavior is not protected.",
+                "mission_type": "test_coverage",
+                "affected_files": MissionBuilderAgent._test_targets(source_files),
+                "priority": "critical",
+                "estimated_effort": "hours",
+                "expected_impact": "Adds executable regression tests without modifying production modules.",
+                "verification_requirements": ["pytest passes", "ruff clean"],
+            })
+
+        doc_pct = float(snapshot.get("documented_functions_pct", 0.0) or 0.0)
+        if doc_pct < 90.0 and python_files:
+            missions.append({
+                "title": "Improve Python documentation",
+                "problem": f"Only {doc_pct:.1f}% of Python functions are documented.",
+                "mission_type": "documentation",
+                "affected_files": python_files[:3],
+                "priority": "medium",
+                "estimated_effort": "hours",
+                "expected_impact": "Improves maintainability and code comprehension.",
+                "verification_requirements": ["pytest passes", "ruff clean"],
+            })
+
+        lint_count = int(snapshot.get("lint_error_count", 0) or 0)
+        if lint_count > 0 and python_files:
+            missions.append({
+                "title": "Resolve lint findings",
+                "problem": f"Ruff reports {lint_count} lint finding(s).",
+                "mission_type": "refactor",
+                "affected_files": python_files[:3],
+                "priority": "high",
+                "estimated_effort": "hours",
+                "expected_impact": "Improves code quality and catches common defects early.",
+                "verification_requirements": ["pytest passes", "ruff clean"],
+            })
+
+        todo_count = int(snapshot.get("todo_count", 0) or 0)
+        if todo_count > 0 and python_files:
+            missions.append({
+                "title": "Resolve TODO and FIXME markers",
+                "problem": f"The repository contains {todo_count} TODO/FIXME marker(s).",
+                "mission_type": "bug_fix",
+                "affected_files": python_files[:3],
+                "priority": "low",
+                "estimated_effort": "hours",
+                "expected_impact": "Reduces unresolved implementation debt.",
+                "verification_requirements": ["pytest passes", "TODO/FIXME scan passes"],
+            })
+
+        return missions
 
     @staticmethod
     def _test_targets(files: list[str]) -> list[str]:
