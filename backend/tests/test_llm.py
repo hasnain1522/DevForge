@@ -64,3 +64,31 @@ def test_factory_orders_openai_and_openrouter_fallback(monkeypatch):
     client = create_llm_client()
     assert [provider.name for provider in client._providers] == ["openai", "openrouter"]
     assert [provider.model for provider in client._providers] == ["gpt-test", "router-test"]
+
+def test_call_text_retries_before_fallback():
+    client = _client()
+    openai_call = AsyncMock(
+        side_effect=[RuntimeError("temporary"), RuntimeError("temporary"), _response("updated")]
+    )
+    router_call = AsyncMock(return_value=_response("fallback"))
+    client._providers[0].client.chat.completions.create = openai_call
+    client._providers[1].client.chat.completions.create = router_call
+
+    result = asyncio.run(client.call_text("system", "user"))
+    assert result == "updated"
+    assert openai_call.await_count == 3
+    router_call.assert_not_awaited()
+
+
+def test_call_text_falls_back_after_retries():
+    client = _client()
+    openai_call = AsyncMock(side_effect=RuntimeError("provider unavailable"))
+    router_call = AsyncMock(return_value=_response("fallback"))
+    client._providers[0].client.chat.completions.create = openai_call
+    client._providers[1].client.chat.completions.create = router_call
+
+    result = asyncio.run(client.call_text("system", "user"))
+    assert result == "fallback"
+    assert openai_call.await_count == 3
+    router_call.assert_awaited_once()
+
