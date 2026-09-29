@@ -3,17 +3,29 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from devforge.config import settings
 
-# SQLite engine — connect_args only needed for SQLite
+
+def _database_url() -> str:
+    """Return a SQLAlchemy-compatible database URL for SQLite or PostgreSQL."""
+    url = settings.database_url.strip()
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
+DATABASE_URL = _database_url()
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
 engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False},
+    DATABASE_URL,
+    connect_args=connect_args,
     echo=settings.debug,
 )
 
 
 def init_db() -> None:
-    """Create tables and add ownership columns to existing SQLite databases."""
-    # Import models so SQLModel registers them before create_all
+    """Create tables and run SQLite-only legacy migrations."""
     from devforge.db import models  # noqa: F401
     SQLModel.metadata.create_all(engine)
     if engine.dialect.name == "sqlite":
