@@ -90,10 +90,18 @@ class MissionBuilderAgent(BaseAgent):
                 self._build_user_prompt(snapshot),
                 response_model=MissionsResponse,
             )
-        except LLMError:
-            raise
+        except LLMError as exc:
+            logger.warning(
+                "LLM mission generation failed; using deterministic fallback: %s",
+                exc,
+            )
+            return self._fallback_missions(snapshot)
         except Exception as exc:
-            raise LLMError(f"Unexpected error during mission generation: {exc}") from exc
+            logger.warning(
+                "Unexpected mission generation failure; using deterministic fallback: %s",
+                exc,
+            )
+            return self._fallback_missions(snapshot)
 
         if not isinstance(result, MissionsResponse):
             raise LLMError("LLM response did not validate as MissionsResponse")
