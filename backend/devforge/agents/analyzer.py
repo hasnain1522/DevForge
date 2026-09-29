@@ -183,6 +183,7 @@ class RepositoryAnalyzerAgent(BaseAgent):
 
         result = {
             "file_count": file_count,
+            "python_files": python_files,
             "test_file_count": test_file_count,
             "test_function_count": test_function_count,
             "todo_count": todo_count,
