@@ -24,7 +24,7 @@ export default function Overview() {
     <section className="devforge-reveal">
       <div className="rounded-3xl border border-cyan-300/10 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/40 p-7 text-white shadow-xl sm:p-9">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Command center</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{justRegistered ? 'Welcome.' : 'Welcome back' + (user?.email ? ', ' + user.email.split('@')[0] : '') + '.'}</h1>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Welcome{user?.email ? ', ' + user.email.split('@')[0] : ''}.</h1>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">{justRegistered ? 'Your DevForge workspace is ready. Start by analyzing a repository and turn the findings into engineering missions.' : 'DevForge is ready. Analyze a repository, turn the evidence into engineering missions, and follow every change through verification.'}</p>
         <div className="mt-6 flex flex-wrap gap-3"><Link to="/analyze" className="rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-200">Analyze repository →</Link><Link to="/missions" className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white transition hover:bg-white/10">Open missions</Link></div>
       </div>
