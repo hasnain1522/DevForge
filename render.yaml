@@ -24,4 +24,12 @@ services:
       - key: AUTH_COOKIE_SECURE
         value: "true"
       - key: DATABASE_URL
-        value: sqlite:///./devforge.db
+        fromDatabase:
+          name: devforge-db
+          property: connectionString
+
+databases:
+  - name: devforge-db
+    plan: free
+    databaseName: devforge
+    user: devforge
