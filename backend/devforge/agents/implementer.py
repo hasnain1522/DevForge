@@ -29,14 +29,32 @@ class ImplementerAgent(BaseAgent):
             await self.emit("implementer", started_event, f"Preparing mission change for {filename}", str(relative))
             try:
                 target = (root / relative).resolve()
-                if not target.is_relative_to(root) or not target.is_file():
+                if not target.is_relative_to(root):
+                    raise ValueError("target_missing_or_outside_repository")
+                relative_text = str(relative).replace(chr(92), "/")
+                is_new_test = (
+                    context.get("mission_type") == "test_coverage"
+                    and relative_text.startswith("tests/")
+                    and target.suffix.lower() == ".py"
+                )
+                if target.exists() and not target.is_file():
+                    raise ValueError("target_missing_or_outside_repository")
+                if not target.exists() and not is_new_test:
                     raise ValueError("target_missing_or_outside_repository")
                 if target.suffix.lower() not in EDITABLE_SUFFIXES:
                     raise ValueError("unsupported_file_type")
-                original = target.read_text(encoding="utf-8")
-                text = await self.llm.call_text(
+                original = target.read_text(encoding="utf-8") if target.exists() else ""
+                system_prompt = (
                     "You are a careful Python engineer. Return only the complete updated file contents. "
-                    "Preserve unrelated behavior and do not include markdown fences.",
+                    "Preserve unrelated behavior and do not include markdown fences."
+                )
+                if is_new_test and not original:
+                    system_prompt += (
+                        " This is a new pytest file. Create focused tests for the referenced repository module; "
+                        "do not place test code into production modules."
+                    )
+                text = await self.llm.call_text(
+                    system_prompt,
                     f"Mission: {context['title']}\nProblem: {context['problem']}\n"
                     f"Repository relative path: {relative}\nCurrent file:\n{original}",
                 )
@@ -45,6 +63,7 @@ class ImplementerAgent(BaseAgent):
                     raise ValueError("no_usable_changed_content")
                 if not text.endswith("\n"):
                     text += "\n"
+                target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(text, encoding="utf-8")
                 diff = list(difflib.unified_diff(
                     original.splitlines(), text.splitlines(), lineterm="",
@@ -56,7 +75,8 @@ class ImplementerAgent(BaseAgent):
                     "lines_added": sum(1 for line in diff if line.startswith("+") and not line.startswith("+++")),
                     "lines_deleted": sum(1 for line in diff if line.startswith("-") and not line.startswith("---")),
                 }
-                await self.emit("implementer", completed_event, "Updated file from LLM output", str(relative))
+                event_message = ("Created new test file from LLM output" if is_new_test and not original else "Updated file from LLM output")
+                await self.emit("implementer", completed_event, event_message, str(relative))
                 return str(relative), None
             except Exception as exc:  # noqa: BLE001 - turn per-file errors into persisted checkpoints
                 known_categories = {
