@@ -1,101 +1,43 @@
 # DevForge
 
-**Agentic AI Engineering Control Center**
+**AI Engineering Control Center** — analyze Python repositories, turn findings into missions, execute scoped agent work, and review command-backed verification and impact.
 
-> IBM Bob 2.0 Hackathon — September 25–27, 2026
+DevForge provides an authenticated workspace with per-user repository data, mission execution, persisted event/evidence records, and real-time execution updates over Server-Sent Events. Runtime agents use the backend `LLMClient` configured for OpenAI, with optional OpenRouter fallback. IBM Bob was a development tool during earlier implementation; DevForge does not use Bob at runtime or build time.
 
----
+## Run locally
 
-## What is DevForge?
+1. Copy `.env.example` to `.env`; set `LLM_API_KEY` and a random `AUTH_SECRET` of at least 32 characters. OpenRouter is optional.
+2. Start the API:
 
-DevForge helps developers manage software-maintenance work as structured **Missions**. Point it at a Python repository and it:
+   ```powershell
+   cd backend
+   python -m pip install -e ".[dev]"
+   python -m uvicorn devforge.main:app --reload
+   ```
 
-1. **Analyzes** the codebase — detects test coverage gaps, lint errors, and documentation gaps using Python AST and real tool output
-2. **Generates Missions** — prioritized, actionable engineering tasks derived from the analysis
-3. **Executes Missions** — specialized Python agents (Implementer, Documenter, Tester) work in parallel to address the problems
-4. **Verifies results** — runs the real pytest test suite and ruff linter; reports structured pass/fail
-5. **Reports impact** — before/after metrics showing measurable, objective improvement
+3. In another terminal, start the frontend:
 
-All metrics in the Impact Report come from real tool output — not estimates.
+   ```powershell
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
-> **Note on IBM Bob:** DevForge is an independent software product built *using* IBM Bob 2.0 as our AI development environment. DevForge's runtime agents are ordinary Python coroutines. They do not call or embed IBM Bob's runtime. See [`docs/IBM_BOB_USAGE.md`](docs/IBM_BOB_USAGE.md) (Phase 6) for development evidence.
+Open the Vite URL, register, analyze an accessible local Python repository, review its missions, and start an execution. SQLite is the default database. Treat this MVP as a trusted local environment: repository analysis and verification execute local tools against the selected repository.
 
----
+## Product flow
 
-## Current Status
+- **Analyze:** Python source metrics and prioritized mission generation.
+- **Missions:** inspect, dismiss, and execute repository-scoped work.
+- **Executions:** follow agent activity and persisted execution state.
+- **Evidence and reports:** inspect recorded analysis, file changes, command output, verification, and measured before/after snapshots.
 
-> **Phase 0 — Architecture approved. Phase 1 implementation pending.**
+LLM credentials and the session signing secret stay on the backend. `.env` is git-ignored; do not commit it. See [Evidence](docs/EVIDENCE.md), [Architecture](docs/ARCHITECTURE.md), [Data Model](docs/DATA_MODEL.md), and [Agent Architecture](docs/AGENT_ARCHITECTURE.md).
 
----
+## Validation
 
-## Documentation
+Backend tests live in `backend/tests`. From `backend`, run `python -m pytest` and `python -m ruff check .`. From `frontend`, run `npm run typecheck` and `npm run build`.
 
-| Document | Description |
-|---|---|
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Full system architecture |
-| [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) | Database schema and API response models |
-| [`docs/AGENT_ARCHITECTURE.md`](docs/AGENT_ARCHITECTURE.md) | Agent design, parallel execution model, LLMClient |
-| [`docs/IMPLEMENTATION_PHASES.md`](docs/IMPLEMENTATION_PHASES.md) | Build phases, session plan, phase gates |
-| [`docs/MVP_SCOPE.md`](docs/MVP_SCOPE.md) | Eight must-have items and demo script |
-| [`docs/RISKS.md`](docs/RISKS.md) | Technical and hackathon risks with mitigations |
+## IBM Bob development context
 
----
-
-## Technology Stack
-
-| Layer | Technology |
-|---|---|
-| Backend | Python 3.11 + FastAPI |
-| LLM | OpenAI Python SDK (direct) via `LLMClient` wrapper |
-| Frontend | React 18 + Vite + TypeScript + Tailwind CSS |
-| Database | SQLite + SQLModel |
-| Real-time | Server-Sent Events (SSE) |
-| Verification | `pytest` + `ruff` (Python; subprocess) |
-
-**Primary language target:** Python. JS/TS verification is an optional extension, not required for the MVP.
-
----
-
-## Setup (available after Phase 1)
-
-```bash
-# Copy and fill in your LLM API key
-cp .env.example .env
-
-# Option A — Docker (added in Phase 5)
-docker-compose up
-
-# Option B — Direct
-cd backend
-uv sync
-uv run uvicorn devforge.main:app --reload
-
-cd frontend
-pnpm install
-pnpm dev
-```
-
----
-
-## IBM Bob 2.0 Usage
-
-DevForge was built using IBM Bob 2.0 as our AI development partner. Bob features used:
-
-| Feature | How We Used It |
-|---|---|
-| **Agent mode** | Bob built each backend module autonomously, reading architecture docs before each phase |
-| **Parallel tasks** | Bob simultaneously wrote multiple agent files per session |
-| **Subagents** | Bob spawned a subagent for the React frontend while the main agent built the Python backend |
-| **Document understanding** | Bob read all planning documents before each implementation phase |
-
-Session evidence: [`bob_sessions/`](bob_sessions/)
-
----
-
-## Hackathon
-
-**IBM Bob 2.0 Hackathon** — September 25–27, 2026 — 48-hour build
-
----
-
-*Built with IBM Bob 2.0*
+IBM Bob 2.0 was used as a development environment during earlier implementation. It is not a DevForge dependency, runtime provider, or build step. Genuine Bob development records, if available, belong under [`docs/evidence/bob/`](docs/evidence/bob/); none are included unless actually captured.

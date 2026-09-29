@@ -3,8 +3,8 @@
  * Phase 2: real repository analysis via POST /analyze
  */
 import { useState } from 'react'
-import { analyzeRepository } from '../api/client'
-import type { RepositorySnapshot } from '../types'
+import { analyzeRepository, listRepositories } from '../api/client'
+import type { Repository, RepositorySnapshot } from '../types'
 
 function MetricCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
@@ -19,6 +19,7 @@ function MetricCard({ label, value, sub }: { label: string; value: string | numb
 export default function Dashboard() {
   const [repoPath, setRepoPath] = useState('')
   const [snapshot, setSnapshot] = useState<RepositorySnapshot | null>(null)
+  const [repository, setRepository] = useState<Repository | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,6 +31,8 @@ export default function Dashboard() {
     try {
       const result = await analyzeRepository(repoPath.trim())
       setSnapshot(result)
+      const repos = await listRepositories()
+      setRepository(repos.find(repo => repo.id === result.repository_id) ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed')
     } finally {
@@ -41,19 +44,19 @@ export default function Dashboard() {
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-2">Dashboard</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Analyze a local Python repository to detect issues and generate missions.
+        Analyze a local Python repository path or a public GitHub repository URL to detect issues and generate missions.
       </p>
 
       {/* Repository input */}
       <div className="bg-white border border-gray-200 rounded p-4 mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Repository Path
+            Repository Path or GitHub URL
         </label>
         <div className="flex gap-3">
           <input
             type="text"
             className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="/path/to/your/python/repo"
+            placeholder="/path/to/repo or https://github.com/owner/repo"
             value={repoPath}
             onChange={e => setRepoPath(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
@@ -76,6 +79,10 @@ export default function Dashboard() {
       {snapshot && (
         <div>
           <h2 className="text-lg font-medium text-gray-900 mb-4">Analysis Results</h2>
+          {repository && <div className="mb-4">
+            <h3 className="text-base font-semibold text-gray-900">{repository.name}</h3>
+            {repository.source_url && <p className="text-xs text-gray-500">GitHub · {new URL(repository.source_url).pathname.replace(/^\//, '')}</p>}
+          </div>}
 
           {/* Metric grid */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-6">
@@ -128,7 +135,7 @@ export default function Dashboard() {
 
       {!snapshot && !loading && !error && (
         <div className="rounded border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-400">
-          Enter a repository path above to begin analysis.
+          Enter a repository path or public GitHub URL above to begin analysis.
         </div>
       )}
     </div>

@@ -4,6 +4,8 @@
 
 ---
 
+> This is the original architecture design. For implemented capabilities and current limitations, see [Implementation status](IMPLEMENTATION_PHASES.md). IBM Bob references are development context only. Product evidence is documented in [EVIDENCE.md](EVIDENCE.md).
+
 ## Overview
 
 DevForge is an agentic AI engineering control center that helps developers manage software-maintenance work as structured **Missions**. A developer points DevForge at a repository; it analyzes the codebase, surfaces prioritized Missions, dispatches specialized Python agents to execute them in parallel, verifies the results, and produces a measurable before/after Impact Report.
@@ -309,18 +311,9 @@ All metrics listed below are objectively measured from tool output or static ana
 
 ---
 
-## IBM Bob 2.0 Usage — Build-Time Only
+## IBM Bob development context
 
-IBM Bob 2.0 is our AI development environment. The table below documents how Bob is used **during development** of DevForge. DevForge's runtime agents are independent Python coroutines; they do not call or embed IBM Bob's runtime.
-
-| IBM Bob Feature | How We Use It to Build DevForge |
-|---|---|
-| **Agent mode** | Bob builds each backend module autonomously, reading architecture docs before each phase |
-| **Parallel tasks** | Bob simultaneously writes multiple agent files in one session (e.g. implementer.py + tester.py + documenter.py) |
-| **Subagents** | Bob spawns a subagent to scaffold the React frontend while the main agent builds the backend |
-| **Document understanding** | Bob reads ARCHITECTURE.md, DATA_MODEL.md, and AGENT_ARCHITECTURE.md before each implementation phase |
-
-Evidence: `bob_sessions/` directory contains screenshots from each Bob session.
+IBM Bob was used during earlier development of DevForge. It is not part of the runtime or build system. No particular Bob capability or screenshot is asserted here; genuine records, if available, belong under `docs/evidence/bob/`.
 
 ---
 

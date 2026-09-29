@@ -4,6 +4,8 @@
 
 ---
 
+> This document is the original schema design. The implemented schema also includes users, ownership columns, and evidence; see `backend/devforge/db/models.py` and [Implementation status](IMPLEMENTATION_PHASES.md).
+
 ## Persistence
 
 SQLite database via SQLModel (Pydantic + SQLAlchemy).
@@ -27,12 +29,13 @@ Stores a registered repository entry.
 | Column | Type | Description |
 |---|---|---|
 | `id` | UUID (PK) | Unique identifier |
-| `name` | str | Display name (derived from path) |
+| `name` | str | Human-readable repository name |
 | `path` | str | Local filesystem path |
+| `source_url` | str \| None | Canonical GitHub URL used to keep cloned repository identity stable |
 | `created_at` | datetime | When registered |
 | `status` | str | `pending \| analyzing \| ready \| error` |
 
-Note: `source_url` is removed from the MVP schema. GitHub URL cloning is an optional extension. The demo uses a local path only.
+Local repositories derive their display name from the selected folder. GitHub repositories derive it from the URL path; the source URL keeps the repository ID stable when a new isolated clone is created.
 
 ---
 
@@ -92,6 +95,8 @@ Records one execution of a Mission by the Orchestrator.
 |---|---|---|
 | `id` | UUID (PK) | Unique identifier |
 | `mission_id` | UUID (FK → missions) | Parent mission |
+| `parent_execution_run_id` | UUID (FK → execution_runs) \| None | Prior failed run resumed by this retry; unique when set |
+| `workspace_path` | str \| None | Isolated execution workspace used for safe continuation |
 | `started_at` | datetime | Execution start |
 | `finished_at` | datetime \| None | Execution end |
 | `status` | str | `running \| completed \| failed` |
@@ -112,7 +117,7 @@ Individual agent log events, streamed via SSE and persisted for replay.
 | `execution_run_id` | UUID (FK → execution_runs) | Parent run |
 | `agent_type` | str | `implementer \| tester \| documenter \| orchestrator` |
 | `target_file` | str \| None | File being worked on |
-| `event_type` | str | `started \| progress \| completed \| failed` |
+| `event_type` | str | Agent lifecycle and retry checkpoint events |
 | `message` | str | Human-readable log message |
 | `timestamp` | datetime | Event time |
 

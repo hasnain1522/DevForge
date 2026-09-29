@@ -9,12 +9,19 @@ export type MissionPriority = 'critical' | 'high' | 'medium' | 'low'
 export type MissionStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'dismissed'
 export type ExecutionStatus = 'running' | 'completed' | 'failed'
 export type AgentType = 'implementer' | 'tester' | 'documenter' | 'orchestrator'
-export type EventType = 'started' | 'progress' | 'completed' | 'failed'
+export type EventType = 'started' | 'progress' | 'completed' | 'failed' | 'retry_started' | 'file_skipped' | 'file_retry_started' | 'file_retry_completed' | 'file_retry_failed' | 'retry_completed'
+
+export interface AuthUser {
+  id: string
+  email: string
+  created_at: string
+}
 
 export interface Repository {
   id: string
   name: string
   path: string
+  source_url?: string | null
   status: RepositoryStatus
   created_at: string
 }
@@ -65,6 +72,14 @@ export interface ExecutionRun {
   execution_time_seconds: number | null
 }
 
+export interface ExecutionArtifact {
+  execution_id: string
+  status: 'pending' | 'ready' | 'failed'
+  filename: string | null
+  size_bytes: number
+  created_at: string | null
+}
+
 export interface VerificationResult {
   id: string
   execution_run_id: string
@@ -79,6 +94,10 @@ export interface VerificationResult {
 }
 
 export interface ImpactReport {
+  id: string
+  mission: Mission
+  execution: { id: string; status: ExecutionStatus; execution_time_seconds: number | null }
+  artifact: ExecutionArtifact | null
   mission_id: string
   /** Arithmetic delta — all objective measurements */
   delta_tests_added: number
@@ -90,10 +109,27 @@ export interface ImpactReport {
   verification_passed: boolean
   before_snapshot: RepositorySnapshot
   after_snapshot: RepositorySnapshot
+  changed_files: Array<{ path: string; before_sha256: string; after_sha256: string; lines_added: number; lines_deleted: number }>
+  verification: VerificationResult & { raw_output: string } | null
+  agent_actions: Array<{ agent_type: AgentType; event_type: EventType; message: string; target_file: string | null; timestamp: string }>
+  evidence: EvidenceRecord[]
+}
+
+export interface EvidenceRecord {
+  id: string
+  user_id?: string
+  repository_id: string | null
+  execution_id: string | null
+  type: string
+  title: string
+  description: string
+  payload: Record<string, unknown>
+  timestamp: string
 }
 
 export interface SubtaskLogEvent {
   execution_run_id: string
+  mission_id: string
   agent_type: AgentType
   event_type: EventType
   message: string

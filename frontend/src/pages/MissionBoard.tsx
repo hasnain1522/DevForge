@@ -2,9 +2,10 @@
  * MissionBoard — displays persisted missions for a repository.
  * Phase 2: real missions retrieved from GET /missions?repository_id=...
  */
-import { useState } from 'react'
-import { listMissions, updateMissionStatus } from '../api/client'
-import type { Mission, MissionPriority, MissionType } from '../types'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { executeMission, listMissions, listRepositories, updateMissionStatus } from '../api/client'
+import type { Mission, MissionPriority, MissionType, Repository } from '../types'
 
 const PRIORITY_BADGE: Record<MissionPriority, string> = {
   critical: 'bg-red-100 text-red-700',
@@ -21,8 +22,9 @@ const TYPE_LABEL: Record<MissionType, string> = {
   dependency_update: 'Dependencies',
 }
 
-function MissionCard({ mission, onDismiss }: { mission: Mission; onDismiss: (id: string) => void }) {
+function MissionCard({ mission, onDismiss, onExecute }: { mission: Mission; onDismiss: (id: string) => void; onExecute: (id: string) => Promise<void> }) {
   const [dismissing, setDismissing] = useState(false)
+  const [executing, setExecuting] = useState(false)
 
   async function handleDismiss() {
     setDismissing(true)
@@ -32,6 +34,11 @@ function MissionCard({ mission, onDismiss }: { mission: Mission; onDismiss: (id:
     } catch {
       setDismissing(false)
     }
+  }
+
+  async function handleExecute() {
+    setExecuting(true)
+    try { await onExecute(mission.id) } finally { setExecuting(false) }
   }
 
   return (
@@ -45,13 +52,12 @@ function MissionCard({ mission, onDismiss }: { mission: Mission; onDismiss: (id:
             {TYPE_LABEL[mission.mission_type as MissionType] ?? mission.mission_type}
           </span>
         </div>
-        <button
-          onClick={handleDismiss}
-          disabled={dismissing}
-          className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50 shrink-0"
-        >
-          Dismiss
-        </button>
+        <div className="flex items-center gap-3 shrink-0">
+          <button onClick={handleExecute} disabled={executing || mission.status === 'in_progress'} className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50">
+            {executing || mission.status === 'in_progress' ? 'Starting…' : 'Execute'}
+          </button>
+          <button onClick={handleDismiss} disabled={dismissing} className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50">Dismiss</button>
+        </div>
       </div>
 
       <h3 className="text-sm font-medium text-gray-900 mb-1">{mission.title}</h3>
@@ -73,11 +79,14 @@ function MissionCard({ mission, onDismiss }: { mission: Mission; onDismiss: (id:
 }
 
 export default function MissionBoard() {
+  const navigate = useNavigate()
   const [repositoryId, setRepositoryId] = useState('')
-  const [inputId, setInputId] = useState('')
+  const [repositories, setRepositories] = useState<Repository[]>([])
   const [missions, setMissions] = useState<Mission[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => { listRepositories().then(setRepositories).catch(err => setError(err instanceof Error ? err.message : 'Could not load repositories')) }, [])
 
   async function loadMissions(repoId: string) {
     if (!repoId.trim()) return
@@ -98,6 +107,16 @@ export default function MissionBoard() {
     setMissions(prev => prev.filter(m => m.id !== id))
   }
 
+  async function handleExecute(id: string) {
+    setError(null)
+    try {
+      const { run_id } = await executeMission(id)
+      navigate(`/execution/${run_id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start execution')
+    }
+  }
+
   const active = missions.filter(m => m.status !== 'dismissed')
 
   return (
@@ -107,28 +126,12 @@ export default function MissionBoard() {
         Prioritized engineering missions generated from repository analysis.
       </p>
 
-      {/* Repository ID input */}
       <div className="bg-white border border-gray-200 rounded p-4 mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Repository ID
+        <label className="block text-sm font-medium text-gray-700">Repository
+          <select className="mt-2 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" value={repositoryId} onChange={e => void loadMissions(e.target.value)}>
+            <option value="">Choose a repository</option>{repositories.map(repo => <option key={repo.id} value={repo.id}>{repo.name}{repo.source_url ? ` · GitHub • ${new URL(repo.source_url).pathname.replace(/^\//, '')}` : ''}</option>)}
+          </select>
         </label>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-            placeholder="Paste repository ID from Dashboard"
-            value={inputId}
-            onChange={e => setInputId(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && loadMissions(inputId)}
-          />
-          <button
-            onClick={() => loadMissions(inputId)}
-            disabled={loading || !inputId.trim()}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Loading…' : 'Load Missions'}
-          </button>
-        </div>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
@@ -148,7 +151,7 @@ export default function MissionBoard() {
           ) : (
             <div className="space-y-3">
               {active.map(mission => (
-                <MissionCard key={mission.id} mission={mission} onDismiss={handleDismiss} />
+                <MissionCard key={mission.id} mission={mission} onDismiss={handleDismiss} onExecute={handleExecute} />
               ))}
             </div>
           )}
@@ -157,7 +160,7 @@ export default function MissionBoard() {
 
       {!repositoryId && !loading && (
         <div className="rounded border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-400">
-          Run analysis on the Dashboard first, then paste the Repository ID here.
+          Analyze a repository first. Its missions will appear here.
         </div>
       )}
     </div>

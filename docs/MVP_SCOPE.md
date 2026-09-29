@@ -4,6 +4,8 @@
 
 ---
 
+> This document describes the original hackathon target. It is not a current completion checklist; see [Implementation status](IMPLEMENTATION_PHASES.md) for shipped scope and known limitations.
+
 ## Definition of MVP
 
 The MVP is the minimum set of working features that, together, demonstrate the full DevForge workflow end-to-end and satisfy all four hackathon judging criteria. Every item on this list must work in the live demo.

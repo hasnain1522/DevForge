@@ -4,6 +4,8 @@
 
 ---
 
+> This document captures the original agent design. Current implementation status and limitations are listed in [Implementation status](IMPLEMENTATION_PHASES.md). IBM Bob is development-time context only; it is not a runtime dependency.
+
 ## Important Distinction
 
 DevForge's agents are **ordinary Python coroutines** implemented using `asyncio` and the OpenAI Python SDK. They are not IBM Bob subagents, do not call IBM Bob's runtime, and make no claim to reproduce IBM Bob's proprietary capabilities. IBM Bob 2.0 is our **development tool** — we use it to *build* DevForge. That usage is documented in the "IBM Bob Build-Time Usage" section at the end of this document.
@@ -249,7 +251,7 @@ Interleaved SSE events from Round 1 make parallel execution visually obvious in 
 
 **Output:** `VerificationResult`
 
-Note: TesterAgent depends on `VerificationRunner` being implemented. Both are delivered in Phase 3 of the implementation plan.
+TesterAgent delegates verification to the implemented `VerificationRunner`; pytest, Ruff, and TODO/FIXME checks run as repository subprocesses.
 
 ---
 
@@ -421,7 +423,7 @@ The following table documents how IBM Bob 2.0 is used **during development** to 
 | **Document understanding** | Bob reads `ARCHITECTURE.md`, `DATA_MODEL.md`, and `AGENT_ARCHITECTURE.md` before each implementation phase to stay aligned with the plan | All phases |
 | **Document understanding** | Bob reads the hackathon brief to produce this architecture | Phase 0 |
 
-Evidence: `bob_sessions/` directory contains screenshots from each Bob session.
+Genuine Bob development records, if available, belong under `docs/evidence/bob/`. Their presence is not assumed.
 
 **DevForge analogue (for presentation purposes):**
 
