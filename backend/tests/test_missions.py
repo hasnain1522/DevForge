@@ -71,6 +71,7 @@ class TestMissionBuilderAgent:
             "languages": '{"python": 10}',
             "top_issues": '["Low test coverage"]',
             "analysis_summary": "A small Python project.",
+            "python_files": ["app.py", "database.py", "main.py"],
         }
         defaults.update(overrides)
         return defaults
@@ -102,28 +103,36 @@ class TestMissionBuilderAgent:
         assert priorities == sorted(priorities, key=lambda p: order.get(p, 99))
 
     @pytest.mark.asyncio
-    async def test_llm_failure_raises_llmerror(self):
-        """LLM failure must raise LLMError, not return fabricated missions."""
+    async def test_llm_failure_uses_objective_fallback(self):
+        """LLM failure should still produce actionable missions from objective metrics."""
         mock_llm = MagicMock()
         mock_llm.call_json = AsyncMock(side_effect=LLMError("API down"))
 
         agent = MissionBuilderAgent(llm=mock_llm)
-        with pytest.raises(LLMError):
-            await agent.run({"snapshot": self._make_snapshot()})
+        result = await agent.run({"snapshot": self._make_snapshot()})
+
+        missions = result["missions"]
+        assert missions
+        assert missions[0]["mission_type"] == "test_coverage"
+        assert missions[0]["affected_files"] == [
+            "tests/test_app.py",
+            "tests/test_database.py",
+            "tests/test_main.py",
+        ]
 
     @pytest.mark.asyncio
-    async def test_no_fabricated_missions_on_failure(self):
-        """On LLM failure, the result must not contain any missions."""
+    async def test_empty_llm_response_uses_objective_fallback(self):
+        """An empty validated LLM response should produce objective missions."""
         mock_llm = MagicMock()
-        mock_llm.call_json = AsyncMock(side_effect=LLMError("timeout"))
+        mock_llm.call_json = AsyncMock(
+            return_value=MissionsResponse(missions=[])
+        )
 
         agent = MissionBuilderAgent(llm=mock_llm)
-        try:
-            result = await agent.run({"snapshot": self._make_snapshot()})
-            # If it doesn't raise, missions must be empty
-            assert result.get("missions", []) == []
-        except LLMError:
-            pass  # This is the expected path
+        result = await agent.run({"snapshot": self._make_snapshot()})
+
+        assert result["missions"]
+        assert result["missions"][0]["mission_type"] == "test_coverage"
 
     def test_mission_spec_rejects_empty_affected_files(self):
         """MissionSpec should reject missions with no affected files."""
