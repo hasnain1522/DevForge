@@ -1,5 +1,8 @@
 /**
  * Same-origin API calls use the HttpOnly session cookie set by the backend.
+ * During Vite development, /api is proxied to FastAPI and stripped before forwarding.
+ * In the production Docker deployment FastAPI serves both the API and React app,
+ * so API routes live at their native paths (for example /auth/login).
  */
 import type {
   AuthUser,
@@ -11,7 +14,7 @@ import type {
   RepositorySnapshot,
 } from '../types'
 
-const BASE = '/api'
+const BASE = import.meta.env.DEV ? '/api' : ''
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
@@ -130,7 +133,6 @@ export async function downloadExecutionArtifact(runId: string, filename: string)
   link.href = objectUrl
   link.download = filename
   document.body.append(link)
-  link.click()
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
 }
