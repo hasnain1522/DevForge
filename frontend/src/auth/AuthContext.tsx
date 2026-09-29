@@ -19,9 +19,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true
-    getCurrentUser().then(value => { if (active) setUser(value) })
-      .catch(() => { if (active) setUser(null) })
-      .finally(() => { if (active) setLoading(false) })
+    const restoreSession = async () => {
+      try {
+        setUser(await getCurrentUser())
+      } catch {
+        // Give a just-established browser session one short retry before treating
+        // it as signed out. This avoids a refresh race during a cold deployment.
+        await new Promise(resolve => window.setTimeout(resolve, 350))
+        try {
+          if (active) setUser(await getCurrentUser())
+        } catch {
+          if (active) setUser(null)
+        }
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    void restoreSession()
     return () => { active = false }
   }, [])
 
