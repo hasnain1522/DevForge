@@ -19,6 +19,8 @@ class SubtaskLogEvent:
     This is the SSE payload format defined in DATA_MODEL.md.
     """
     execution_run_id: str
+    mission_id: str
+    user_id: str
     agent_type: str          # implementer | tester | documenter | orchestrator
     event_type: str          # started | progress | completed | failed
     message: str
@@ -29,6 +31,7 @@ class SubtaskLogEvent:
         """Serialise for SSE transport."""
         return {
             "execution_run_id": self.execution_run_id,
+            "mission_id": self.mission_id,
             "agent_type": self.agent_type,
             "event_type": self.event_type,
             "message": self.message,
@@ -61,6 +64,19 @@ class EventBus:
 
         Phase 3 will also persist the event to the subtask_logs table.
         """
+        from sqlmodel import Session
+
+        from devforge.db.models import SubtaskLog
+        from devforge.db.session import engine
+
+        with Session(engine) as session:
+            session.add(SubtaskLog(
+                user_id=event.user_id,
+                execution_run_id=run_id, agent_type=event.agent_type,
+                event_type=event.event_type, message=event.message,
+                target_file=event.target_file, timestamp=event.timestamp,
+            ))
+            session.commit()
         queue = self._ensure_queue(run_id)
         await queue.put(event)
         logger.debug("EventBus: published %s/%s for run %s", event.agent_type, event.event_type, run_id)
@@ -84,7 +100,7 @@ class EventBus:
 
     def cleanup(self, run_id: str) -> None:
         """Remove the queue for a completed run."""
-        self._queues.pop(run_id, None)
+        # Keep completed queues until the SSE subscriber consumes the sentinel.
 
 
 # Application-level singleton — imported by agents and API routes

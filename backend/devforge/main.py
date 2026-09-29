@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from devforge.api import analyze, execute, missions, report, verify
+from devforge.api import analyze, auth, evidence, execute, executions, missions, report, verify
 from devforge.config import settings
 from devforge.db.session import init_db
 
@@ -50,8 +50,12 @@ app.add_middleware(
 
 # Register API routers
 app.include_router(analyze.router)
+app.include_router(analyze.repositories_router)
+app.include_router(auth.router)
 app.include_router(missions.router)
+app.include_router(evidence.router)
 app.include_router(execute.router)
+app.include_router(executions.router)
 app.include_router(verify.router)
 app.include_router(report.router)
 

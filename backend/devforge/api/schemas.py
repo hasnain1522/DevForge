@@ -16,6 +16,7 @@ class RepositoryOut(BaseModel):
     id: str
     name: str
     path: str
+    source_url: str | None = None
     status: str
     created_at: datetime
 

@@ -1,17 +1,7 @@
-"""
-LLMClient — thin wrapper around openai.AsyncOpenAI.
-
-All agents call this; never the SDK directly.
-Supports JSON-structured responses with Pydantic validation and retry,
-and plain-text responses for full-file generation.
-
-Provider configuration via environment:
-  LLM_API_KEY   — OpenAI API key (or compatible)
-  LLM_MODEL     — model name, e.g. gpt-4o-mini
-  LLM_BASE_URL  — optional; leave empty for OpenAI, set for Ollama
-"""
+"""Provider fallback kept behind the existing OpenAI-compatible LLMClient."""
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -21,24 +11,44 @@ logger = logging.getLogger(__name__)
 
 
 class LLMError(Exception):
-    """Raised when the LLM call fails after all retries."""
+    """Raised when no configured provider can return a usable response."""
+
+
+@dataclass
+class _Provider:
+    name: str
+    model: str
+    client: AsyncOpenAI
 
 
 class LLMClient:
-    """
-    Thin async wrapper around openai.AsyncOpenAI.
+    """Call the preferred provider and fall back without exposing provider errors."""
 
-    Phase 1: constructor and method signatures implemented.
-    Actual LLM calls will be exercised from Phase 2 onwards.
-    """
-
-    def __init__(self, api_key: str, model: str, base_url: str | None = None) -> None:
-        self._client = AsyncOpenAI(
-            api_key=api_key,
-            # Pass base_url only when explicitly set; None uses the OpenAI default.
-            base_url=base_url if base_url else None,
-        )
-        self.model = model
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = "gpt-4o-mini",
+        base_url: str | None = None,
+        *,
+        providers: list[tuple[str, str, str, str | None]] | None = None,
+    ) -> None:
+        """Accept legacy single-provider args or ordered (name,key,model,url) providers."""
+        self._providers: list[_Provider] = []
+        definitions = providers or ([
+            ("openai", api_key or "", model, base_url),
+        ] if api_key else [])
+        for name, key, provider_model, provider_url in definitions:
+            if not key:
+                continue
+            headers = {"HTTP-Referer": "https://devforge.local", "X-Title": "DevForge"} \
+                if name == "openrouter" else None
+            client = AsyncOpenAI(
+                api_key=key,
+                base_url=provider_url or None,
+                default_headers=headers,
+                max_retries=0,
+            )
+            self._providers.append(_Provider(name, provider_model, client))
         self.max_retries = 3
 
     async def call_json(
@@ -47,75 +57,70 @@ class LLMClient:
         user_prompt: str,
         response_model: type[BaseModel] | None = None,
     ) -> dict[str, Any] | BaseModel:
-        """
-        Call the LLM and return a validated JSON object.
-
-        Retries up to max_retries on JSON parse or Pydantic validation failure,
-        feeding the error back into the prompt on each retry.
-        """
-        current_user_prompt = user_prompt
-
-        for attempt in range(self.max_retries):
-            try:
-                response = await self._client.chat.completions.create(
-                    model=self.model,
-                    response_format={"type": "json_object"},
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": current_user_prompt},
-                    ],
-                )
-                raw = response.choices[0].message.content or ""
-                logger.debug("LLM raw response (attempt %d): %.200s", attempt + 1, raw)
-
-                data = json.loads(raw)
-                if response_model is not None:
-                    return response_model.model_validate(data)
-                return data
-
-            except (json.JSONDecodeError, ValidationError) as exc:
-                if attempt == self.max_retries - 1:
-                    raise LLMError(
-                        f"LLM returned invalid JSON/schema after {self.max_retries} attempts"
-                    ) from exc
-                logger.warning(
-                    "LLM parse error on attempt %d/%d: %s — retrying",
-                    attempt + 1,
-                    self.max_retries,
-                    exc,
-                )
-                current_user_prompt = (
-                    f"{user_prompt}\n\nPrevious attempt failed with error:\n{exc}\n"
-                    "Please return valid JSON that matches the required schema."
-                )
-
-        # Should not be reached, but satisfies type checker
-        raise LLMError("Unexpected exit from retry loop")
+        for provider in self._providers:
+            current_prompt = user_prompt
+            for attempt in range(self.max_retries):
+                try:
+                    response = await provider.client.chat.completions.create(
+                        model=provider.model,
+                        response_format={"type": "json_object"},
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": current_prompt},
+                        ],
+                    )
+                    raw = response.choices[0].message.content or ""
+                    data = json.loads(raw)
+                    return response_model.model_validate(data) if response_model else data
+                except (json.JSONDecodeError, ValidationError):
+                    if attempt + 1 < self.max_retries:
+                        current_prompt = (
+                            f"{user_prompt}\n\nReturn valid JSON matching the required schema."
+                        )
+                    else:
+                        break
+                except Exception as exc:  # noqa: BLE001 - providers expose multiple exception types
+                    logger.warning("LLM provider %s failed (%s); trying fallback", provider.name,
+                                   type(exc).__name__)
+                    break
+        if not self._providers:
+            raise LLMError("No LLM provider is configured")
+        raise LLMError("Configured LLM providers could not return valid JSON")
 
     async def call_text(self, system_prompt: str, user_prompt: str) -> str:
-        """
-        Call the LLM and return raw text.
-
-        Used by ImplementerAgent (Phase 3) for full-file content generation.
-        """
-        response = await self._client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        return response.choices[0].message.content or ""
+        for provider in self._providers:
+            try:
+                response = await provider.client.chat.completions.create(
+                    model=provider.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                )
+                content = response.choices[0].message.content
+                if content:
+                    return content
+                logger.warning("LLM provider %s returned empty text; trying fallback", provider.name)
+            except Exception as exc:  # noqa: BLE001 - providers expose multiple exception types
+                logger.warning("LLM provider %s failed (%s); trying fallback", provider.name,
+                               type(exc).__name__)
+        if not self._providers:
+            raise LLMError("No LLM provider is configured")
+        raise LLMError("Configured LLM providers could not return text")
 
 
 def create_llm_client() -> LLMClient:
-    """
-    Factory that creates an LLMClient from application settings.
-    Imported and called by agents in Phase 2+.
-    """
+    """Build provider order from settings; agents remain provider agnostic."""
     from devforge.config import settings
-    return LLMClient(
-        api_key=settings.llm_api_key,
-        model=settings.llm_model,
-        base_url=settings.llm_base_url if settings.llm_base_url else None,
+
+    openai_provider = (
+        "openai", settings.llm_api_key if settings.llm_api_key != "not-configured" else "",
+        settings.llm_model, settings.llm_base_url or None,
     )
+    openrouter_provider = (
+        "openrouter", settings.openrouter_api_key, settings.openrouter_model or settings.llm_model,
+        settings.openrouter_base_url or "https://openrouter.ai/api/v1",
+    )
+    providers = [openrouter_provider, openai_provider] if settings.llm_provider == "openrouter" \
+        else [openai_provider, openrouter_provider]
+    return LLMClient(providers=providers)

@@ -1,7 +1,8 @@
 """
 SQLModel database table definitions.
 
-Matches DATA_MODEL.md exactly:
+Core tables are documented in DATA_MODEL.md; execution artifacts and failures
+persist delivery and sanitized terminal diagnostics:
 - repositories
 - repository_snapshots
 - missions
@@ -10,7 +11,7 @@ Matches DATA_MODEL.md exactly:
 - verification_results
 - impact_reports
 
-No estimated_manual_minutes. No source_url. coverage_pct is nullable.
+No estimated_manual_minutes. coverage_pct is nullable.
 """
 import uuid
 from datetime import UTC, datetime
@@ -30,8 +31,10 @@ class Repository(SQLModel, table=True):
     __tablename__ = "repositories"
 
     id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
     name: str
     path: str
+    source_url: str | None = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=_now)
     status: str = Field(default="pending")  # pending | analyzing | ready | error
 
@@ -40,6 +43,7 @@ class RepositorySnapshot(SQLModel, table=True):
     __tablename__ = "repository_snapshots"
 
     id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
     repository_id: str = Field(foreign_key="repositories.id")
     taken_at: datetime = Field(default_factory=_now)
     snapshot_type: str  # baseline | post_mission
@@ -63,6 +67,7 @@ class Mission(SQLModel, table=True):
     __tablename__ = "missions"
 
     id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
     repository_id: str = Field(foreign_key="repositories.id")
     title: str
     problem: str
@@ -81,7 +86,12 @@ class ExecutionRun(SQLModel, table=True):
     __tablename__ = "execution_runs"
 
     id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
     mission_id: str = Field(foreign_key="missions.id")
+    parent_execution_run_id: str | None = Field(
+        default=None, foreign_key="execution_runs.id",
+    )
+    workspace_path: str | None = Field(default=None)
     started_at: datetime = Field(default_factory=_now)
     finished_at: datetime | None = Field(default=None)
     status: str = Field(default="running")  # running | completed | failed
@@ -91,10 +101,40 @@ class ExecutionRun(SQLModel, table=True):
     execution_time_seconds: float | None = Field(default=None)
 
 
+class ExecutionArtifact(SQLModel, table=True):
+    __tablename__ = "execution_artifacts"
+
+    id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    execution_run_id: str = Field(foreign_key="execution_runs.id", unique=True, index=True)
+    status: str = Field(default="pending")  # pending | ready | failed
+    filename: str | None = Field(default=None)
+    size_bytes: int = Field(default=0)
+    created_at: datetime | None = Field(default=None)
+    storage_path: str | None = Field(default=None)
+
+
+class ExecutionFailure(SQLModel, table=True):
+    """Sanitized terminal failure details for an execution."""
+
+    __tablename__ = "execution_failures"
+
+    id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    execution_run_id: str = Field(foreign_key="execution_runs.id", unique=True, index=True)
+    stage: str
+    category: str
+    reason: str
+    command: str | None = Field(default=None)
+    exit_code: int | None = Field(default=None)
+    created_at: datetime = Field(default_factory=_now)
+
+
 class SubtaskLog(SQLModel, table=True):
     __tablename__ = "subtask_logs"
 
     id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
     execution_run_id: str = Field(foreign_key="execution_runs.id")
     agent_type: str  # implementer | tester | documenter | orchestrator
     target_file: str | None = Field(default=None)
@@ -107,6 +147,7 @@ class VerificationResult(SQLModel, table=True):
     __tablename__ = "verification_results"
 
     id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
     execution_run_id: str = Field(foreign_key="execution_runs.id")
     run_at: datetime = Field(default_factory=_now)
     passed: bool = Field(default=False)
@@ -123,6 +164,7 @@ class ImpactReport(SQLModel, table=True):
     __tablename__ = "impact_reports"
 
     id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
     mission_id: str = Field(foreign_key="missions.id")
     execution_run_id: str = Field(foreign_key="execution_runs.id")
     before_snapshot_id: str = Field(foreign_key="repository_snapshots.id")
@@ -137,3 +179,26 @@ class ImpactReport(SQLModel, table=True):
     agent_execution_time_seconds: float = Field(default=0.0)
     verification_passed: bool = Field(default=False)
     generated_at: datetime = Field(default_factory=_now)
+
+
+class User(SQLModel, table=True):
+    __tablename__ = "users"
+
+    id: str = Field(default_factory=_new_uuid, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    password_hash: str
+    created_at: datetime = Field(default_factory=_now)
+
+
+class Evidence(SQLModel, table=True):
+    __tablename__ = "evidence"
+
+    id: str = Field(default_factory=_new_uuid, primary_key=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    execution_id: str | None = Field(default=None, foreign_key="execution_runs.id", index=True)
+    repository_id: str | None = Field(default=None, foreign_key="repositories.id", index=True)
+    evidence_type: str = Field(index=True)
+    title: str
+    description: str
+    payload: str = Field(default="{}")
+    timestamp: datetime = Field(default_factory=_now, index=True)

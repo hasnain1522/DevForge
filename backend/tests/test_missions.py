@@ -1,5 +1,6 @@
 """Phase 2 tests for MissionBuilderAgent and mission/analyze API endpoints."""
 import json
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -220,6 +221,23 @@ class TestMissionPersistence:
 # ---------------------------------------------------------------------------
 
 class TestAnalyzeAPI:
+    @pytest.fixture(autouse=True)
+    def authenticate(self, monkeypatch):
+        from devforge.config import settings
+        from devforge.db.session import init_db
+
+        init_db()
+        monkeypatch.setattr(settings, "auth_secret", "test-secret-for-authentication-0123456789")
+        client.cookies.clear()
+        response = client.post("/auth/register", json={
+            "email": f"{uuid.uuid4().hex}@example.test",
+            "password": "sufficiently-long-test-password",
+        })
+        assert response.status_code == 201, response.text
+        self.user_id = response.json()["id"]
+        yield
+        client.cookies.clear()
+
     def _mock_analyze_and_missions(self, monkeypatch, tmp_path):
         """
         Patch create_llm_client to return a mock that avoids real LLM calls.
@@ -275,6 +293,27 @@ class TestAnalyzeAPI:
         """POST /analyze with a non-existent path should return 400."""
         response = client.post("/analyze", json={"repo_path": "/nonexistent/repo/path"})
         assert response.status_code == 400
+
+    def test_analyze_github_url_uses_resolved_clone_path(self, monkeypatch, tmp_path):
+        """GitHub URL input is resolved before analysis and repository persistence."""
+        repo, _ = self._mock_analyze_and_missions(monkeypatch, tmp_path)
+        calls = []
+
+        def resolve_input(value):
+            calls.append(value)
+            return repo
+
+        monkeypatch.setattr("devforge.api.analyze.resolve_repository_input", resolve_input)
+        response = client.post(
+            "/analyze", json={"repo_path": "https://github.com/example/project"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert calls == ["https://github.com/example/project"]
+        with Session(engine) as session:
+            stored = session.get(Repository, response.json()["repository_id"])
+            assert stored is not None
+            assert stored.path == str(repo.resolve())
 
     def test_missions_returned_after_analyze(self, monkeypatch, tmp_path):
         """After analysis, GET /missions?repository_id=... should return persisted missions."""

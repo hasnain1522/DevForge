@@ -31,24 +31,17 @@ def test_db_tables_created():
         assert result is not None
         assert result.name == "test-repo"
         assert result.status == "pending"
-        # Confirm no source_url column exists on the model
-        assert not hasattr(result, "source_url")
+        # Local-path repositories have no canonical remote source URL.
+        assert result.source_url is None
         # Clean up
         session.delete(result)
         session.commit()
 
 
-def test_phase3_stub_routes_return_not_implemented():
-    """Phase 3+ routes should still return a not-implemented response, not 500."""
-    routes_to_check = [
-        ("/execute/fake-mission-id", "POST"),
-        ("/verify/fake-run-id", "POST"),
-        ("/report/fake-repo-id", "GET"),
-    ]
-    for path, method in routes_to_check:
-        if method == "POST":
-            resp = client.post(path)
-        else:
-            resp = client.get(path)
-        assert resp.status_code == 200, f"{method} {path} returned {resp.status_code}"
-        assert "detail" in resp.json()
+def test_product_data_apis_require_authentication():
+    """Owned repository and execution APIs reject anonymous access."""
+    assert client.post("/execute/fake-mission-id").status_code == 401
+    assert client.post("/verify/fake-run-id").status_code == 401
+    assert client.get("/report/fake-repo-id").status_code == 401
+    assert client.get("/evidence").status_code == 401
+    assert client.get("/repositories").status_code == 401

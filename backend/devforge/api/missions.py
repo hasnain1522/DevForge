@@ -10,8 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from devforge.api.dependencies import get_current_user
 from devforge.api.schemas import MissionOut
-from devforge.db.models import Mission
+from devforge.db.models import Mission, User
 from devforge.db.session import get_session
 
 logger = logging.getLogger(__name__)
@@ -24,12 +25,15 @@ VALID_STATUSES = frozenset({"pending", "in_progress", "completed", "failed", "di
 async def list_missions(
     repository_id: str,
     session: Session = Depends(get_session),  # noqa: B008
+    user: User = Depends(get_current_user),  # noqa: B008
 ) -> list[MissionOut]:
     """
     Return all missions for the given repository_id, ordered by priority.
     Returns an empty list if the repository has no missions yet.
     """
-    stmt = select(Mission).where(Mission.repository_id == repository_id)
+    stmt = select(Mission).where(
+        Mission.repository_id == repository_id, Mission.user_id == user.id,
+    )
     missions = session.exec(stmt).all()
 
     # Sort by priority: critical → high → medium → low
@@ -48,6 +52,7 @@ async def update_mission_status(
     mission_id: str,
     update: MissionStatusUpdate,
     session: Session = Depends(get_session),  # noqa: B008
+    user: User = Depends(get_current_user),  # noqa: B008
 ) -> MissionOut:
     """
     Update the status of a mission (e.g. dismiss it from the board).
@@ -58,7 +63,9 @@ async def update_mission_status(
             detail=f"Invalid status '{update.status}'. Must be one of: {sorted(VALID_STATUSES)}",
         )
 
-    mission = session.get(Mission, mission_id)
+    mission = session.exec(select(Mission).where(
+        Mission.id == mission_id, Mission.user_id == user.id,
+    )).first()
     if mission is None:
         raise HTTPException(status_code=404, detail=f"Mission {mission_id} not found")
 
