@@ -1,6 +1,7 @@
 """Provider fallback kept behind the existing OpenAI-compatible LLMClient."""
 import json
 import logging
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
@@ -89,21 +90,36 @@ class LLMClient:
 
     async def call_text(self, system_prompt: str, user_prompt: str) -> str:
         for provider in self._providers:
-            try:
-                response = await provider.client.chat.completions.create(
-                    model=provider.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                )
-                content = response.choices[0].message.content
-                if content:
-                    return content
-                logger.warning("LLM provider %s returned empty text; trying fallback", provider.name)
-            except Exception as exc:  # noqa: BLE001 - providers expose multiple exception types
-                logger.warning("LLM provider %s failed (%s); trying fallback", provider.name,
-                               type(exc).__name__)
+            current_prompt = user_prompt
+            for attempt in range(self.max_retries):
+                try:
+                    response = await provider.client.chat.completions.create(
+                        model=provider.model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": current_prompt},
+                        ],
+                    )
+                    content = response.choices[0].message.content
+                    if content:
+                        return content.strip()
+                    logger.warning(
+                        "LLM provider %s returned empty text on attempt %d/%d",
+                        provider.name, attempt + 1, self.max_retries,
+                    )
+                except Exception as exc:  # noqa: BLE001 - providers expose multiple exception types
+                    logger.warning(
+                        "LLM provider %s failed on attempt %d/%d (%s)",
+                        provider.name, attempt + 1, self.max_retries, type(exc).__name__,
+                    )
+                if attempt + 1 < self.max_retries:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    current_prompt = (
+                        f"{user_prompt}\n\n"
+                        "Return only the complete updated file contents. "
+                        "Do not use markdown fences."
+                    )
+            logger.warning("LLM provider %s exhausted text retries; trying fallback", provider.name)
         if not self._providers:
             raise LLMError("No LLM provider is configured")
         raise LLMError("Configured LLM providers could not return text")
