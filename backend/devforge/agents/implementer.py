@@ -21,7 +21,8 @@ class ImplementerAgent(BaseAgent):
     @staticmethod
     def _local_test_fallback(root: Path, relative: str) -> str:
         """Create executable pytest smoke tests when the LLM provider is unavailable."""
-        source_name = Path(relative).name
+        test_name = Path(relative).name
+        source_name = test_name.removeprefix("test_")
         source_path = root / source_name
         if not source_path.is_file():
             raise ValueError("target_missing_or_outside_repository")
