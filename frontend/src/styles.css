@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #e5eefb;
+  background: #050914;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 15% 10%, rgba(34,211,238,.11), transparent 30%), radial-gradient(circle at 85% 20%, rgba(99,102,241,.12), transparent 28%), #050914; }
+button, input, select { font: inherit; }
+.devforge-shell { position: relative; isolation: isolate; overflow: hidden; }
+.devforge-grid { background-image: linear-gradient(rgba(148,163,184,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.055) 1px, transparent 1px); background-size: 44px 44px; }
+.devforge-orb { position:absolute; width:22rem; height:22rem; border-radius:999px; filter:blur(70px); opacity:.18; pointer-events:none; animation:devforge-float 10s ease-in-out infinite; }
+.devforge-orb.one { left:-9rem; top:10rem; background:#22d3ee; }
+.devforge-orb.two { right:-8rem; top:24rem; background:#6366f1; animation-delay:-4s; }
+.devforge-reveal { animation:devforge-reveal .7s cubic-bezier(.22,1,.36,1) both; }
+.devforge-reveal-delay-1 { animation-delay:.08s; }
+.devforge-reveal-delay-2 { animation-delay:.16s; }
+.devforge-card { transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease; }
+.devforge-card:hover { transform:translateY(-3px); border-color:rgba(34,211,238,.3); box-shadow:0 20px 60px rgba(2,8,23,.3); }
+.devforge-pulse { animation:devforge-pulse 2.2s ease-in-out infinite; }
+.devforge-scan { position:relative; overflow:hidden; }
+.devforge-scan::after { content:""; position:absolute; inset:-20% 0 auto; height:35%; background:linear-gradient(180deg,transparent,rgba(34,211,238,.08),transparent); animation:devforge-scan 4.5s linear infinite; pointer-events:none; }
+@keyframes devforge-reveal { from{opacity:0;transform:translateY(18px) scale(.985)} to{opacity:1;transform:translateY(0) scale(1)} }
+@keyframes devforge-float { 0%,100%{transform:translate3d(0,0,0) scale(1)} 50%{transform:translate3d(0,-24px,0) scale(1.06)} }
+@keyframes devforge-pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,211,238,.35)} 50%{opacity:.72;box-shadow:0 0 0 8px rgba(34,211,238,0)} }
+@keyframes devforge-scan { from{transform:translateY(-160%)} to{transform:translateY(420%)} }
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
