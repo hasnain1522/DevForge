@@ -48,14 +48,14 @@ export default function Dashboard() {
       </p>
 
       {/* Repository input */}
-      <div className="bg-white border border-gray-200 rounded p-4 mb-6">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 mb-6 shadow-sm">
         <label className="block text-sm font-medium text-gray-700 mb-2">
             Repository Path or GitHub URL
         </label>
         <div className="flex gap-3">
           <input
             type="text"
-            className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 border border-slate-300 rounded-xl bg-white px-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
             placeholder="/path/to/repo or https://github.com/owner/repo"
             value={repoPath}
             onChange={e => setRepoPath(e.target.value)}
@@ -65,7 +65,7 @@ export default function Dashboard() {
           <button
             onClick={handleAnalyze}
             disabled={loading || !repoPath.trim()}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-xl bg-cyan-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-600/20 transition hover:-translate-y-0.5 hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? 'Analyzing…' : 'Analyze'}
           </button>
