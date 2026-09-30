@@ -151,7 +151,7 @@ export default function ExecutionView() {
           </div>
         </div>
       </section>}
-      <div className="grid gap-4 md:grid-cols-2 mb-6>
+      <div className="grid gap-4 md:grid-cols-2 mb-6">
         <section className="bg-white border border-gray-200 rounded p-4">
           <h2 className="text-sm font-semibold mb-3">Execution event log</h2>
           <div className="space-y-3 max-h-96 overflow-auto">
