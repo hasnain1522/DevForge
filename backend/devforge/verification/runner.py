@@ -134,23 +134,24 @@ class VerificationRunner:
 
         todo_code, todo_output = 0, "Skipped: not required by this mission."
         if run_todo:
-            todo_code, todo_output = await _run(
-                [
-                    sys.executable,
-                    "-c",
-                    (
-                        "from pathlib import Path; import re,sys; "
-                        "files=[p for p in Path('.').rglob('*.py') if not any(x in p.parts for x in "
-                        "('.git','.venv','venv','__pycache__','.pytest_cache'))]; "
-                        "hits=[f'{p}:{i}:{line.strip()}' for p in files for i,line in "
-                        "enumerate(p.read_text(errors='replace').splitlines(),1) if "
-                        "re.search(r'\b(TODO|FIXME)\b',line,re.I)]; "
-                        "print('\n'.join(hits)); sys.exit(bool(hits))"
-                    ),
-                ],
-                root,
-                "TODO/FIXME scan",
-            )
+            # Keep the marker scan in-process. Embedding Python source inside
+            # another Python string is fragile: \b can become a backspace and
+            # escaped newlines can corrupt the generated command.
+            ignored = {".git", ".venv", "venv", "__pycache__", ".pytest_cache"}
+            hits: list[str] = []
+            for file_path in root.rglob("*.py"):
+                if any(part in ignored for part in file_path.parts):
+                    continue
+                try:
+                    lines = file_path.read_text(errors="replace").splitlines()
+                except OSError:
+                    continue
+                for line_number, line in enumerate(lines, 1):
+                    if re.search(r"\b(TODO|FIXME)\b", line, re.IGNORECASE):
+                        relative = file_path.relative_to(root)
+                        hits.append(f"{relative}:{line_number}:{line.strip()}")
+            todo_code = 1 if hits else 0
+            todo_output = "\n".join(hits) if hits else "No TODO/FIXME markers found."
 
         passed = sum(int(x) for x in re.findall(r"(\d+) passed", pytest_output)) if run_pytest else 0
         failed = sum(int(x) for x in re.findall(r"(\d+) failed", pytest_output)) if run_pytest else 0
