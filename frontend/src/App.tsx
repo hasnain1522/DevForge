@@ -73,7 +73,26 @@ function EvidencePage() {
   const [items, setItems] = useState<EvidenceRecord[]>([])
   const [error, setError] = useState('')
   useEffect(() => { listEvidence().then(setItems).catch(e => setError(String(e))) }, [])
-  return <section><h1 className="mb-2 text-2xl font-semibold">Evidence</h1><p className="mb-5 text-sm text-slate-500">Records generated from repository analysis and mission execution.</p>{error && <p className="text-red-600">{error}</p>}{items.length ? <div className="space-y-3">{items.map(item => <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-4"><div className="flex justify-between"><strong>{item.title}</strong><span className="text-xs text-cyan-700">{item.type}</span></div><p className="mt-1 text-sm text-slate-600">{item.description}</p><time className="text-xs text-slate-400">{new Date(item.timestamp).toLocaleString()}</time></article>)}</div> : !error && <p className="rounded border border-dashed p-8 text-center text-slate-500">No evidence yet. Analyze a repository or execute a mission.</p>}</section>
+  return <section>
+    <h1 className="mb-2 text-2xl font-semibold">Evidence</h1>
+    <p className="mb-5 text-sm text-slate-500">Records generated from repository analysis and mission execution.</p>
+    {error && <p className="text-red-600">{error}</p>}
+    {items.length ? <div className="space-y-3">{items.map(item => (
+      <details key={item.id} className="rounded-lg border border-slate-200 bg-white p-4">
+        <summary className="cursor-pointer list-none">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <strong>{item.title}</strong>
+            <span className="text-xs text-cyan-700">{item.type}</span>
+          </div>
+          <p className="mt-1 text-sm text-slate-600">{item.description}</p>
+          <time className="text-xs text-slate-400">{new Date(item.timestamp).toLocaleString()}</time>
+        </summary>
+        {Object.keys(item.payload).length > 0 && (
+          <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-slate-950 p-3 text-xs text-slate-100">{JSON.stringify(item.payload, null, 2)}</pre>
+        )}
+      </details>
+    ))}</div> : !error && <p className="rounded border border-dashed p-8 text-center text-slate-500">No evidence yet. Analyze a repository or execute a mission.</p>}
+  </section>
 }
 
 export default function App() {
