@@ -82,10 +82,14 @@ async def execute_mission(
         **before_metrics,
     )
     session.add(before)
-    artifact = ExecutionArtifact(user_id=user.id, execution_run_id=run.id)
     mission.status = "in_progress"
     mission.updated_at = datetime.now(UTC)
     session.add(run)
+    # Persist the parent row before creating the FK-dependent artifact.
+    # This makes the execution_runs -> execution_artifacts dependency explicit
+    # and avoids FK races/order ambiguity across database backends.
+    session.flush()
+    artifact = ExecutionArtifact(user_id=user.id, execution_run_id=run.id)
     session.add(artifact)
     session.add(mission)
     record_evidence(
@@ -246,8 +250,10 @@ async def retry_execution(
     )
     retry_workspace = execution_workspace_path(retry_run.id)
     retry_run.workspace_path = str(retry_workspace)
-    artifact = ExecutionArtifact(user_id=user.id, execution_run_id=retry_run.id)
     session.add(retry_run)
+    # Flush the retry parent before inserting its FK-dependent artifact.
+    session.flush()
+    artifact = ExecutionArtifact(user_id=user.id, execution_run_id=retry_run.id)
     session.add(artifact)
     try:
         # The unique parent link reserves this retry before workspace copying, preventing races.
