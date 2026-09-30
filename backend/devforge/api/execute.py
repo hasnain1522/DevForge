@@ -209,6 +209,78 @@ async def download_execution_artifact(
     return FileResponse(path, media_type="application/zip", filename=artifact.filename)
 
 
+@router.get("/{run_id}/artifact/files")
+async def list_execution_artifact_files(
+    run_id: str,
+    session: Session = Depends(get_session),  # noqa: B008
+    user: User = Depends(get_current_user),  # noqa: B008
+):
+    """List files inside a generated repository artifact without extracting it."""
+    artifact = _owned_ready_artifact(session, run_id, user.id)
+    path = Path(artifact.storage_path).resolve()
+    if not path.is_relative_to(artifact_storage_root()) or not path.is_file():
+        raise HTTPException(status_code=404, detail="Repository artifact is unavailable")
+    try:
+        with zipfile.ZipFile(path) as archive:
+            files = [
+                {"path": item.filename, "size_bytes": item.file_size}
+                for item in archive.infolist()
+                if not item.is_dir()
+            ]
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise HTTPException(status_code=404, detail="Repository artifact is unavailable") from exc
+    return {"filename": artifact.filename, "files": files}
+
+
+@router.get("/{run_id}/artifact/file")
+async def open_execution_artifact_file(
+    run_id: str,
+    path: str,
+    session: Session = Depends(get_session),  # noqa: B008
+    user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Open a text file from a generated repository artifact in the browser."""
+    artifact = _owned_ready_artifact(session, run_id, user.id)
+    archive_path = Path(artifact.storage_path).resolve()
+    if not archive_path.is_relative_to(artifact_storage_root()) or not archive_path.is_file():
+        raise HTTPException(status_code=404, detail="Repository artifact is unavailable")
+    requested = path.replace("\\", "/").lstrip("/")
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            member = archive.getinfo(requested)
+            if member.is_dir():
+                raise HTTPException(status_code=400, detail="Directories cannot be opened")
+            if member.file_size > 512 * 1024:
+                raise HTTPException(status_code=413, detail="File is too large to preview")
+            data = archive.read(member)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="File not found in repository artifact") from exc
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise HTTPException(status_code=404, detail="Repository artifact is unavailable") from exc
+    if b"\x00" in data:
+        raise HTTPException(status_code=415, detail="Binary files cannot be previewed")
+    return {
+        "path": requested,
+        "content": data.decode("utf-8", errors="replace"),
+        "size_bytes": member.file_size,
+    }
+
+
+def _owned_ready_artifact(session: Session, run_id: str, user_id: str) -> ExecutionArtifact:
+    run = session.exec(select(ExecutionRun).where(
+        ExecutionRun.id == run_id, ExecutionRun.user_id == user_id,
+    )).first()
+    if run is None:
+        raise HTTPException(status_code=404, detail="Execution not found")
+    artifact = session.exec(select(ExecutionArtifact).where(
+        ExecutionArtifact.execution_run_id == run_id,
+        ExecutionArtifact.user_id == user_id,
+    )).first()
+    if artifact is None or artifact.status != "ready" or not artifact.storage_path or not artifact.filename:
+        raise HTTPException(status_code=404, detail="No successful repository artifact is available")
+    return artifact
+
+
 @router.post("/{run_id}/retry", status_code=202)
 async def retry_execution(
     run_id: str,
