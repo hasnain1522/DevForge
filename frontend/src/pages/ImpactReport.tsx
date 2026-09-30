@@ -105,7 +105,28 @@ export default function ImpactReport() {
       <div className="mb-5 rounded-lg border bg-white p-4"><h3 className="mb-3 font-semibold">Changed files</h3>{report.changed_files.length ? report.changed_files.map(file => <div key={file.path} className="border-t py-2 text-sm"><strong>{file.path}</strong><span className="ml-2 text-slate-500">+{file.lines_added} / −{file.lines_deleted} lines</span></div>) : <p className="text-sm text-slate-500">No file changes recorded.</p>}</div>
       <div className="mb-5 rounded-lg border bg-white p-4"><h3 className="mb-3 font-semibold">Verification</h3>{report.verification ? <><p className={report.verification.passed ? 'text-emerald-700' : 'text-rose-700'}>{report.verification.passed ? 'Passed' : 'Failed'} · pytest {report.verification.pass_count} passed, {report.verification.fail_count} failed · Ruff {report.verification.lint_errors} issues</p><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-slate-950 p-3 text-xs text-slate-100">{report.verification.raw_output}</pre></> : <p className="text-sm text-slate-500">No verification result was persisted.</p>}</div>
       <div className="mb-5 rounded-lg border bg-white p-4"><h3 className="mb-3 font-semibold">Execution event log</h3><div className="space-y-2">{report.agent_actions.map((action, i) => <div key={`${action.timestamp}-${i}`} className="text-sm"><span className="font-medium capitalize">{action.agent_type}</span><span className="ml-2 text-slate-500">{action.event_type} · {action.message}</span></div>)}</div></div>
-      <div className="rounded-lg border bg-white p-4"><h3 className="mb-3 font-semibold">Evidence records ({report.evidence.length})</h3><div className="space-y-2">{report.evidence.map(item => <div key={item.id} className="border-t pt-2"><span className="text-xs font-semibold text-cyan-800">{item.type}</span><p className="text-sm">{item.title}</p></div>)}</div></div>
+      <div className="rounded-lg border bg-white p-4">
+        <h3 className="mb-3 font-semibold">Evidence records ({report.evidence.length})</h3>
+        <div className="space-y-3">
+          {report.evidence.map(item => (
+            <details key={item.id} className="rounded border border-slate-200 bg-slate-50 p-3">
+              <summary className="cursor-pointer list-none">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-cyan-800">{item.type}</span>
+                  <span className="text-sm font-medium text-slate-900">{item.title}</span>
+                  <span className="text-xs text-slate-400">{new Date(item.timestamp).toLocaleString()}</span>
+                </div>
+              </summary>
+              <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                <p className="whitespace-pre-wrap text-sm text-slate-700">{item.description || 'No description recorded.'}</p>
+                {Object.keys(item.payload).length > 0 && (
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-slate-950 p-3 text-xs text-slate-100">{JSON.stringify(item.payload, null, 2)}</pre>
+                )}
+              </div>
+            </details>
+          ))}
+        </div>
+      </div>
     </>}
   </section>
 }
