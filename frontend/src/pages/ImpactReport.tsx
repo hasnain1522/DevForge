@@ -86,7 +86,7 @@ export default function ImpactReport() {
             onClick={() => void loadArtifactFiles()}
           >{artifactLoading ? 'Opening…' : 'Open Files'}</button>
         </div>
-      </div>}
+      </div>
       {artifactFiles.length > 0 && <div className="mb-5 rounded-lg border bg-white p-4">
         <h3 className="mb-3 font-semibold">Polished repository files</h3>
         <div className="grid gap-4 md:grid-cols-[240px_1fr]">
