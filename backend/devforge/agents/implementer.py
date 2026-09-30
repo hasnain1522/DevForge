@@ -1,6 +1,6 @@
 """LLM backed, mission-scoped source file implementer."""
-import difflib
 import ast
+import difflib
 import hashlib
 from pathlib import Path
 
@@ -42,20 +42,19 @@ class ImplementerAgent(BaseAgent):
             "",
             "import importlib",
             "",
-            "",
             "MODULE = importlib.import_module(" + repr(module) + ")",
             "",
         ]
         for name in functions:
             lines.extend([
                 "def test_" + name + "_is_available():",
-                "    assert callable(getattr(MODULE, " + repr(name) + "))",
+                "    assert callable(MODULE." + name + ")",
                 "",
             ])
         for name in classes:
             lines.extend([
                 "def test_" + name + "_is_available():",
-                "    assert isinstance(getattr(MODULE, " + repr(name) + "), type)",
+                "    assert isinstance(MODULE." + name + ", type)",
                 "",
             ])
         if not functions and not classes:
