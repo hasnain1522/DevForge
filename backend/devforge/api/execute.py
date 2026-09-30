@@ -38,6 +38,7 @@ from devforge.utils.delivery import (
     create_repository_zip,
     execution_workspace_path,
 )
+from devforge.utils.repository_input import RepositoryInputError, resolve_repository_input
 from devforge.utils.event_bus import SubtaskLogEvent, event_bus
 from devforge.utils.evidence import record_evidence
 from devforge.utils.llm import LLMError, create_llm_client
@@ -69,10 +70,15 @@ async def execute_mission(
 
     run = ExecutionRun(mission_id=mission.id, user_id=user.id)
     try:
+        if not Path(repo.path).is_dir() and repo.source_url:
+            repo.path = str(resolve_repository_input(repo.source_url))
+            session.add(repo)
+            session.commit()
+            session.refresh(repo)
         working_copy = create_execution_copy(repo.path, run.id)
         run.workspace_path = str(working_copy)
         before_metrics = capture_metrics(str(working_copy))
-    except (OSError, ValueError, shutil.Error) as exc:
+    except (OSError, ValueError, shutil.Error, RepositoryInputError) as exc:
         raise HTTPException(status_code=400, detail="Could not prepare an isolated repository workspace") from exc
     before = RepositorySnapshot(
         user_id=user.id,
