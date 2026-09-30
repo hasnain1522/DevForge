@@ -12,18 +12,30 @@ class TesterAgent(BaseAgent):
         self.emit = emit
 
     async def run(self, context: dict) -> dict:
-        await self.emit("tester", "started", "Running pytest, ruff, and TODO/FIXME verification")
+        requirements = context.get("verification_requirements") or [
+            "pytest passes",
+            "ruff clean",
+            "TODO/FIXME scan passes",
+        ]
+        await self.emit(
+            "tester",
+            "started",
+            "Running configured verification: " + ", ".join(requirements),
+        )
         try:
-            result = await self.runner.run(context["repo_path"])
+            result = await self.runner.run(context["repo_path"], requirements)
         except VerificationFailure as exc:
             await self.emit(
-                "tester", "failed",
+                "tester",
+                "failed",
                 f"{exc.category}: {exc.reason} Command: {exc.command}.",
             )
             raise
         state = "completed" if result["passed"] else "failed"
-        message = (f"{result['pass_count']} passed, {result['fail_count']} failed; "
-                   f"{result['lint_errors']} ruff findings")
+        message = (
+            f"{result['pass_count']} passed, {result['fail_count']} failed; "
+            f"{result['lint_errors']} ruff findings"
+        )
         if result.get("failure"):
             failure = result["failure"]
             message += f"; {failure['reason']}"
