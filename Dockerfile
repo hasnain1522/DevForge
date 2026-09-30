@@ -17,6 +17,7 @@ COPY --from=frontend-build /build/frontend/dist /app/frontend/dist
 
 WORKDIR /app/backend
 ENV PYTHONUNBUFFERED=1
+ENV DEVFORGE_ENV=production
 EXPOSE 10000
 
 CMD ["uvicorn", "devforge.main:app", "--host", "0.0.0.0", "--port", "10000"]
