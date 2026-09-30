@@ -137,7 +137,7 @@ export default function ExecutionView() {
               disabled={artifactLoading}
               onClick={() => void loadArtifactFiles()}
             >{artifactLoading ? 'Opening…' : 'Open Files'}</button>
-          </div>
+          </div>}
         </div>
       </section>}
       {artifactFiles.length > 0 && <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
