@@ -280,7 +280,7 @@ async def retry_execution(
         retry_run.workspace_path = str(continuation)
         mission.status = "in_progress"
         mission.updated_at = datetime.now(UTC)
-        baseline_metrics = capture_metrics(repository.path)
+        baseline_metrics = capture_metrics(str(continuation))
         session.add(RepositorySnapshot(
             user_id=user.id, repository_id=mission.repository_id, mission_id=mission.id,
             snapshot_type="baseline", **baseline_metrics,
@@ -517,8 +517,13 @@ async def _execute(
                     Repository.id == mission.repository_id, Repository.user_id == user_id,
                 )).first() if mission else None
             if mission and repository:
+                parent_workspace = (
+                    Path(original.workspace_path).resolve()
+                    if original.workspace_path
+                    else Path(repository.path).resolve()
+                )
                 file_changes = _compare_mission_files(
-                    repository.path, repo_path, json.loads(mission.affected_files),
+                    str(parent_workspace), repo_path, json.loads(mission.affected_files),
                 )
                 if result:
                     result["file_changes"] = file_changes
