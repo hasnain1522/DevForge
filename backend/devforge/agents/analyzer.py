@@ -149,9 +149,12 @@ class RepositoryAnalyzerAgent(BaseAgent):
             test_function_count += _count_test_functions_in_source(source)
             todo_count += _count_todo_in_source(source)
 
-            doc, tot = _documented_functions_pct(source)
-            documented_funcs += doc
-            total_funcs += tot
+            # Documentation coverage measures production/source functions only.
+            # Test files must not change this metric as a side effect of adding tests.
+            if not _is_test_file(rel_path):
+                doc, tot = _documented_functions_pct(source)
+                documented_funcs += doc
+                total_funcs += tot
 
         documented_functions_pct = (
             round(documented_funcs / total_funcs * 100, 1) if total_funcs > 0 else 0.0
