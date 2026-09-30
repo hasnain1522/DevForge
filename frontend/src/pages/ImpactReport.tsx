@@ -109,21 +109,17 @@ export default function ImpactReport() {
         <h3 className="mb-3 font-semibold">Evidence records ({report.evidence.length})</h3>
         <div className="space-y-3">
           {report.evidence.map(item => (
-            <details key={item.id} className="rounded border border-slate-200 bg-slate-50 p-3">
-              <summary className="cursor-pointer list-none">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold text-cyan-800">{item.type}</span>
-                  <span className="text-sm font-medium text-slate-900">{item.title}</span>
-                  <span className="text-xs text-slate-400">{new Date(item.timestamp).toLocaleString()}</span>
-                </div>
-              </summary>
-              <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
-                <p className="whitespace-pre-wrap text-sm text-slate-700">{item.description || 'No description recorded.'}</p>
-                {Object.keys(item.payload).length > 0 && (
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-slate-950 p-3 text-xs text-slate-100">{JSON.stringify(item.payload, null, 2)}</pre>
-                )}
+            <article key={item.id} className="rounded border border-slate-200 bg-slate-50 p-3 text-slate-900">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-cyan-800">{item.type}</span>
+                <span className="text-sm font-medium text-slate-900">{item.title}</span>
+                <span className="text-xs text-slate-400">{new Date(item.timestamp).toLocaleString()}</span>
               </div>
-            </details>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.description || 'No description recorded.'}</p>
+              {Object.keys(item.payload).length > 0 && (
+                <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-slate-950 p-3 text-xs text-slate-100">{JSON.stringify(item.payload, null, 2)}</pre>
+              )}
+            </article>
           ))}
         </div>
       </div>
