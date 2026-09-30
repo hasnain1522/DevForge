@@ -78,19 +78,17 @@ function EvidencePage() {
     <p className="mb-5 text-sm text-slate-500">Records generated from repository analysis and mission execution.</p>
     {error && <p className="text-red-600">{error}</p>}
     {items.length ? <div className="space-y-3">{items.map(item => (
-      <details key={item.id} className="rounded-lg border border-slate-200 bg-white p-4">
-        <summary className="cursor-pointer list-none">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <strong>{item.title}</strong>
-            <span className="text-xs text-cyan-700">{item.type}</span>
-          </div>
-          <p className="mt-1 text-sm text-slate-600">{item.description}</p>
-          <time className="text-xs text-slate-400">{new Date(item.timestamp).toLocaleString()}</time>
-        </summary>
+      <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-4 text-slate-900 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <strong className="text-sm font-semibold text-slate-900">{item.title}</strong>
+          <span className="text-xs font-semibold text-cyan-700">{item.type}</span>
+        </div>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.description || 'No description recorded.'}</p>
+        <time className="mt-2 block text-xs text-slate-400">{new Date(item.timestamp).toLocaleString()}</time>
         {Object.keys(item.payload).length > 0 && (
           <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-slate-950 p-3 text-xs text-slate-100">{JSON.stringify(item.payload, null, 2)}</pre>
         )}
-      </details>
+      </article>
     ))}</div> : !error && <p className="rounded border border-dashed p-8 text-center text-slate-500">No evidence yet. Analyze a repository or execute a mission.</p>}
   </section>
 }
