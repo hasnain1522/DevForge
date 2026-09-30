@@ -64,6 +64,20 @@ app.include_router(verify.router)
 app.include_router(report.router)
 
 
+@app.middleware("http")
+async def spa_fallback(request, call_next):
+    """Return the React shell for browser refreshes on client-side routes."""
+    response = await call_next(request)
+    path = request.url.path
+    accepts_html = "text/html" in request.headers.get("accept", "")
+    is_api = path.startswith("/api/") or path in {"/health", "/docs", "/redoc", "/openapi.json"}
+    if response.status_code == 404 and accepts_html and not is_api and FRONTEND_DIST.exists():
+        index = FRONTEND_DIST / "index.html"
+        if index.is_file():
+            return FileResponse(index)
+    return response
+
+
 @app.get("/health", tags=["system"])
 async def health() -> dict:
     """Health check — returns 200 when the application is running."""
