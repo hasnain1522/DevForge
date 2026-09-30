@@ -206,7 +206,12 @@ async def download_execution_artifact(
     path = Path(artifact.storage_path).resolve()
     if not path.is_relative_to(artifact_storage_root()) or not path.is_file():
         raise HTTPException(status_code=404, detail="Repository artifact is unavailable")
-    return FileResponse(path, media_type="application/zip", filename=artifact.filename)
+    return FileResponse(
+        path,
+        media_type="application/zip",
+        filename=artifact.filename,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/{run_id}/artifact/files")
