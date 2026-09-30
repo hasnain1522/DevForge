@@ -139,6 +139,7 @@ export default function ExecutionView() {
             >{artifactLoading ? 'Opening…' : 'Open Files'}</button>
           </div>
         </div>
+      </div>
       </section>}
       {artifactFiles.length > 0 && <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="mb-3 text-sm font-semibold">Polished repository files</h2>
