@@ -196,6 +196,44 @@ IBM Bob 2.0 was used as a development environment during the hackathon build. Bo
 
 Where genuine Bob development evidence is captured, it belongs under `docs/evidence/bob/`.
 
+## Hackathon Submission Note
+
+### Why the project was not submitted
+
+DevForge was intentionally **not submitted as a completed hackathon entry** because the final validation stage could not be truthfully completed before the submission window. The application was implemented and the local/backend validation work was advanced, but the configured LLM provider credentials were unavailable for the final end-to-end run.
+
+That meant we could validate the engineering foundation, but we could not honestly claim that the complete live path had been proven:
+
+- real LLM provider response
+- real agent-driven file modification
+- persisted execution result from that real run
+- live SSE execution stream from that run
+- browser-level end-to-end execution
+- final before/after impact report generated from the complete live path
+
+Codex had already validated the codebase with **43 backend tests, Ruff, frontend typecheck/build, and `git diff --check`**. Those checks demonstrated substantial implementation progress, but they were not a substitute for the missing real-provider execution. Rather than submit a demo that implied capabilities we had not fully verified, the project was kept as an honest, inspectable build.
+
+This is also why the current README distinguishes **development-time tooling** from **DevForge's runtime**: IBM Bob 2.0 was used to build the project, while DevForge's own agents and verification pipeline are the product being demonstrated.
+
+## AI-Assisted Development: Who Did What?
+
+DevForge was built through a deliberate combination of development tools rather than pretending one AI system did everything.
+
+| Contributor / Tool | Role in the build | Why it was used |
+| --- | --- | --- |
+| **Mohammed Hasnain** | Product owner, architect, decision-maker, integrator, tester of the workflow, and final reviewer | Defined the problem, locked the product direction, made architecture/product decisions, supplied requirements, reviewed changes, and decided what could be honestly claimed |
+| **IBM Bob 2.0** | Primary hackathon development environment and build-time AI coding partner | Used for the hackathon-required development workflow, repository implementation, agent-mode work, parallel/sub-agent tasks, document understanding, and development evidence captured in `bob_sessions/` |
+| **OpenAI Codex** | Independent validation, debugging, and repository-level engineering support | Used to inspect the implementation, run/coordinate validation, identify defects, fix integration issues, and verify backend/frontend quality gates before the final end-to-end test |
+| **ChatGPT** | Architecture/product reasoning, debugging partner, documentation, UX planning, and implementation guidance | Used to reason through the system design, turn requirements into concrete tasks, inspect failures, guide fixes, shape the execution/evidence/report experience, and prepare the final documentation/story |
+
+### Why the roles were separated
+
+The separation was intentional. Bob was the **hackathon development environment**, Codex acted as an **engineering validation/debugging layer**, ChatGPT acted as the **architecture and reasoning partner**, and Hasnain remained the **human decision-maker and final owner**.
+
+The important distinction is that these tools did not become DevForge itself. **DevForge is the product.** Its runtime architecture is its own FastAPI + React system with its own agent orchestration, verification, evidence, impact reporting, and artifact delivery.
+
+The project therefore represents an AI-assisted engineering process with human ownership—not a claim that the application was independently produced by one AI system.
+
 ## Project Status
 
 DevForge is an active hackathon MVP focused on a complete, inspectable engineering loop:
