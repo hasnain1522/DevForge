@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from devforge.api import analyze, auth, evidence, execute, executions, missions, report, verify
 from devforge.config import settings
-from devforge.db.session import init_db
+from devforge.db.session import DATABASE_URL, init_db
 
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
@@ -67,7 +67,7 @@ app.include_router(report.router)
 @app.get("/health", tags=["system"])
 async def health() -> dict:
     """Health check — returns 200 when the application is running."""
-    return {"status": "ok", "app": settings.app_name}
+    return {"status": "ok", "app": settings.app_name, "database": "postgresql" if DATABASE_URL.startswith("postgresql") else "sqlite", "auth_configured": len(settings.auth_secret) >= 32}
 
 
 if FRONTEND_DIST.exists():
