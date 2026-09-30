@@ -123,18 +123,41 @@ export async function getExecution(runId: string): Promise<ExecutionState> {
 export async function downloadExecutionArtifact(runId: string, filename: string): Promise<void> {
   const response = await fetch(`${BASE}/execute/${encodeURIComponent(runId)}/artifact`, {
     credentials: 'same-origin',
+    cache: 'no-store',
   })
   if (!response.ok) {
     const detail = await response.text()
     throw new Error(`Artifact download failed (${response.status}): ${detail}`)
   }
-  const objectUrl = URL.createObjectURL(await response.blob())
+  const blob = await response.blob()
+  const objectUrl = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = objectUrl
   link.download = filename
-  document.body.append(link)
-  link.remove()
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  window.setTimeout(() => {
+    link.remove()
+    URL.revokeObjectURL(objectUrl)
+  }, 10000)
+}
+
+export interface ArtifactFile {
+  path: string
+  size_bytes: number
+}
+
+export async function listArtifactFiles(runId: string): Promise<{ filename: string; files: ArtifactFile[] }> {
+  return request<{ filename: string; files: ArtifactFile[] }>(
+    `/execute/${encodeURIComponent(runId)}/artifact/files`,
+  )
+}
+
+export async function openArtifactFile(runId: string, path: string): Promise<{ path: string; content: string; size_bytes: number }> {
+  return request<{ path: string; content: string; size_bytes: number }>(
+    `/execute/${encodeURIComponent(runId)}/artifact/file?path=${encodeURIComponent(path)}`,
+  )
 }
 
 // --- Verify ---
