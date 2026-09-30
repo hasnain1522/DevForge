@@ -114,6 +114,10 @@ class MissionBuilderAgent(BaseAgent):
             mission = spec.model_dump()
             if mission["mission_type"] == "test_coverage":
                 mission["affected_files"] = self._test_targets(mission["affected_files"])
+                mission["verification_requirements"] = [
+                    item for item in mission["verification_requirements"]
+                    if "todo" not in item.lower() and "fixme" not in item.lower()
+                ] or ["pytest passes", "ruff clean"]
             validated.append(mission)
 
         if not validated:
