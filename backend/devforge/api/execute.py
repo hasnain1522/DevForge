@@ -7,6 +7,7 @@ import logging
 import re
 import shutil
 import time
+import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -517,9 +518,13 @@ async def _execute(
                     Repository.id == mission.repository_id, Repository.user_id == user_id,
                 )).first() if mission else None
             if mission and repository:
+                original_run = session.exec(select(ExecutionRun).where(
+                    ExecutionRun.id == parent_execution_id,
+                    ExecutionRun.user_id == user_id,
+                )).first() if parent_execution_id else None
                 parent_workspace = (
-                    Path(original.workspace_path).resolve()
-                    if original.workspace_path
+                    Path(original_run.workspace_path).resolve()
+                    if original_run and original_run.workspace_path
                     else Path(repository.path).resolve()
                 )
                 file_changes = _compare_mission_files(
