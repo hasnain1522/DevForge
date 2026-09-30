@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "DevForge"
     debug: bool = False
+    environment: str = Field(default="development", validation_alias="DEVFORGE_ENV")
+
+    @model_validator(mode="after")
+    def validate_production_database(self):
+        if self.environment == "production" and self.database_url.startswith("sqlite"):
+            raise ValueError("Production requires persistent DATABASE_URL; SQLite is not supported in production")
+        return self
 
 
 settings = Settings()
