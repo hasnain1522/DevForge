@@ -52,8 +52,11 @@ async def _run(command: list[str], cwd: Path, check_name: str) -> tuple[int, str
         env.pop(name, None)
     try:
         process = await asyncio.create_subprocess_exec(
-            *command, cwd=str(cwd), stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT, env=env,
+            *command,
+            cwd=str(cwd),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=env,
         )
         output, _ = await process.communicate()
         return process.returncode or 0, _redact(output.decode(errors="replace"))
@@ -61,7 +64,8 @@ async def _run(command: list[str], cwd: Path, check_name: str) -> tuple[int, str
         raise VerificationFailure(
             category="command_unavailable",
             reason=f"Could not start {check_name}: the Python verification command is unavailable.",
-            command=check_name, exit_code=127,
+            command=check_name,
+            exit_code=127,
         ) from exc
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         raise VerificationFailure(
@@ -87,12 +91,17 @@ def _check_failure(check: str, code: int, output: str, lint_errors: int = 0) -> 
     else:
         reason = "TODO/FIXME scan found matching markers (exit code 1)."
         category = "todo_markers_found"
-    return {"stage": "verification", "category": category, "reason": reason,
-            "command": check, "exit_code": code}
+    return {
+        "stage": "verification",
+        "category": category,
+        "reason": reason,
+        "command": check,
+        "exit_code": code,
+    }
 
 
 class VerificationRunner:
-    async def run(self, repo_path: str) -> dict:
+    async def run(self, repo_path: str, requirements: list[str] | None = None) -> dict:
         root = Path(repo_path).resolve()
         if not root.is_dir():
             raise VerificationFailure(
@@ -100,52 +109,123 @@ class VerificationRunner:
                 reason="The isolated repository workspace is unavailable for verification.",
                 command="pytest",
             )
-        pytest_code, pytest_output = await _run(
-            [sys.executable, "-m", "pytest", "-q"], root, "pytest",
-        )
-        ruff_code, ruff_output = await _run(
-            [sys.executable, "-m", "ruff", "check", "--output-format=json", "."], root, "ruff",
-        )
-        todo_code, todo_output = await _run(
-            [sys.executable, "-c", ("from pathlib import Path; import re,sys; "
-             "files=[p for p in Path('.').rglob('*.py') if not any(x in p.parts for x in "
-             "('.git','.venv','venv','__pycache__','.pytest_cache'))]; "
-             "hits=[f'{p}:{i}:{line.strip()}' for p in files for i,line in "
-             "enumerate(p.read_text(errors='replace').splitlines(),1) if re.search(r'\\b(TODO|FIXME)\\b',line,re.I)]; "
-             "print('\\n'.join(hits)); sys.exit(bool(hits))")], root, "TODO/FIXME scan",
-        )
-        passed = sum(int(x) for x in re.findall(r"(\d+) passed", pytest_output))
-        failed = sum(int(x) for x in re.findall(r"(\d+) failed", pytest_output))
-        errors = sum(int(x) for x in re.findall(r"(\d+) error", pytest_output))
+
+        normalized = [
+            item.lower()
+            for item in (requirements or ["pytest passes", "ruff clean", "TODO/FIXME scan passes"])
+        ]
+        run_pytest = any("pytest" in item or "test" in item for item in normalized)
+        run_ruff = any("ruff" in item for item in normalized)
+        run_todo = any("todo" in item or "fixme" in item for item in normalized)
+
+        pytest_code, pytest_output = 0, "Skipped: not required by this mission."
+        if run_pytest:
+            pytest_code, pytest_output = await _run(
+                [sys.executable, "-m", "pytest", "-q"], root, "pytest"
+            )
+
+        ruff_code, ruff_output = 0, "Skipped: not required by this mission."
+        if run_ruff:
+            ruff_code, ruff_output = await _run(
+                [sys.executable, "-m", "ruff", "check", "--output-format=json", "."],
+                root,
+                "ruff",
+            )
+
+        todo_code, todo_output = 0, "Skipped: not required by this mission."
+        if run_todo:
+            todo_code, todo_output = await _run(
+                [
+                    sys.executable,
+                    "-c",
+                    (
+                        "from pathlib import Path; import re,sys; "
+                        "files=[p for p in Path('.').rglob('*.py') if not any(x in p.parts for x in "
+                        "('.git','.venv','venv','__pycache__','.pytest_cache'))]; "
+                        "hits=[f'{p}:{i}:{line.strip()}' for p in files for i,line in "
+                        "enumerate(p.read_text(errors='replace').splitlines(),1) if "
+                        "re.search(r'\b(TODO|FIXME)\b',line,re.I)]; "
+                        "print('\n'.join(hits)); sys.exit(bool(hits))"
+                    ),
+                ],
+                root,
+                "TODO/FIXME scan",
+            )
+
+        passed = sum(int(x) for x in re.findall(r"(\d+) passed", pytest_output)) if run_pytest else 0
+        failed = sum(int(x) for x in re.findall(r"(\d+) failed", pytest_output)) if run_pytest else 0
+        errors = sum(int(x) for x in re.findall(r"(\d+) error", pytest_output)) if run_pytest else 0
+
         try:
-            lint_errors = len(json.loads(ruff_output))
+            lint_errors = len(json.loads(ruff_output)) if run_ruff else 0
         except json.JSONDecodeError:
             lint_errors = 0 if ruff_code == 0 else 1
-        coverage = re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", pytest_output)
-        checks = [
-            {"check": "pytest", "command": "python -m pytest -q", "exit_code": pytest_code,
-             "passed": pytest_code == 0},
-            {"check": "ruff", "command": "python -m ruff check --output-format=json .",
-             "exit_code": ruff_code, "passed": ruff_code == 0, "finding_count": lint_errors},
-            {"check": "TODO/FIXME scan", "command": "python -c <TODO/FIXME scan>",
-             "exit_code": todo_code, "passed": todo_code == 0},
-        ]
+
+        coverage = (
+            re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", pytest_output)
+            if run_pytest
+            else None
+        )
+
+        checks = []
+        if run_pytest:
+            checks.append({
+                "check": "pytest",
+                "command": "python -m pytest -q",
+                "exit_code": pytest_code,
+                "passed": pytest_code == 0,
+            })
+        if run_ruff:
+            checks.append({
+                "check": "ruff",
+                "command": "python -m ruff check --output-format=json .",
+                "exit_code": ruff_code,
+                "passed": ruff_code == 0,
+                "finding_count": lint_errors,
+            })
+        if run_todo:
+            checks.append({
+                "check": "TODO/FIXME scan",
+                "command": "python -c <TODO/FIXME scan>",
+                "exit_code": todo_code,
+                "passed": todo_code == 0,
+            })
+
         failures = (
             _check_failure("pytest", pytest_code, pytest_output)
-            if pytest_code else None,
+            if run_pytest and pytest_code
+            else None,
             _check_failure("ruff", ruff_code, ruff_output, lint_errors)
-            if ruff_code else None,
+            if run_ruff and ruff_code
+            else None,
             _check_failure("TODO/FIXME scan", todo_code, todo_output)
-            if todo_code else None,
+            if run_todo and todo_code
+            else None,
         )
         failure = next((item for item in failures if item), None)
-        output = (f"$ python -m pytest -q\n{pytest_output}\n"
-                  f"$ python -m ruff check .\n{ruff_output}\n"
-                  f"$ TODO/FIXME scan\n{todo_output}")
-        return asdict(VerificationResult(
-            passed=pytest_code == 0 and ruff_code == 0 and todo_code == 0,
-            test_count=passed + failed + errors, pass_count=passed,
-            fail_count=failed + errors, lint_errors=lint_errors,
-            coverage_pct=float(coverage.group(1)) if coverage else None,
-            raw_output=output, checks=checks, failure=failure,
-        ))
+
+        output_parts = []
+        if run_pytest:
+            output_parts.append(f"$ python -m pytest -q\n{pytest_output}")
+        if run_ruff:
+            output_parts.append(f"$ python -m ruff check .\n{ruff_output}")
+        if run_todo:
+            output_parts.append(f"$ TODO/FIXME scan\n{todo_output}")
+
+        return asdict(
+            VerificationResult(
+                passed=(
+                    (not run_pytest or pytest_code == 0)
+                    and (not run_ruff or ruff_code == 0)
+                    and (not run_todo or todo_code == 0)
+                ),
+                test_count=passed + failed + errors,
+                pass_count=passed,
+                fail_count=failed + errors,
+                lint_errors=lint_errors,
+                coverage_pct=float(coverage.group(1)) if coverage else None,
+                raw_output="\n".join(output_parts),
+                checks=checks,
+                failure=failure,
+            )
+        )
