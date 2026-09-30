@@ -28,9 +28,12 @@ def capture_metrics(repo_path: str) -> dict:
             continue
         test_functions += _count_test_functions_in_source(source)
         todo_count += _count_todo_in_source(source)
-        doc, count = _documented_functions_pct(source)
-        documented += doc
-        total += count
+        # Documentation coverage measures production/source functions only.
+        # Adding tests must not dilute this repository-health metric.
+        if not _is_test_file(relative):
+            doc, count = _documented_functions_pct(source)
+            documented += doc
+            total += count
     lint = count_ruff_errors(str(root))
     return {
         "file_count": len(files),
