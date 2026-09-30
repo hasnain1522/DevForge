@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { downloadExecutionArtifact, getExecution, retryExecution, type ExecutionState } from '../api/client'
+import { downloadExecutionArtifact, getExecution, listArtifactFiles, openArtifactFile, retryExecution, type ExecutionState } from '../api/client'
 import type { SubtaskLogEvent } from '../types'
 
 export default function ExecutionView() {
@@ -10,6 +10,9 @@ export default function ExecutionView() {
   const [events, setEvents] = useState<SubtaskLogEvent[]>([])
   const [error, setError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
+  const [artifactFiles, setArtifactFiles] = useState<Array<{ path: string; size_bytes: number }>>([])
+  const [openedFile, setOpenedFile] = useState<{ path: string; content: string } | null>(null)
+  const [artifactLoading, setArtifactLoading] = useState(false)
 
   useEffect(() => {
     if (!runId) return
@@ -32,7 +35,8 @@ export default function ExecutionView() {
       }
     }
     void refresh()
-    source = new EventSource(`/api/execute/${encodeURIComponent(runId)}/stream`)
+    const apiBase = import.meta.env.DEV ? '/api' : ''
+    source = new EventSource(`${apiBase}/execute/${encodeURIComponent(runId)}/stream`)
     source.onmessage = event => {
       const item = JSON.parse(event.data) as SubtaskLogEvent
       if (active) setEvents(previous => previous.some(old => old.timestamp === item.timestamp && old.message === item.message) ? previous : [...previous, item])
@@ -46,6 +50,32 @@ export default function ExecutionView() {
 
   const statusColor = state?.status === 'completed' ? 'text-green-700 bg-green-50' : state?.status === 'failed' ? 'text-red-700 bg-red-50' : 'text-blue-700 bg-blue-50'
   const skippedFiles = new Set(events.filter(event => event.event_type === 'file_skipped').map(event => event.target_file).filter(Boolean))
+
+  async function loadArtifactFiles() {
+    if (!runId) return
+    setArtifactLoading(true)
+    setError(null)
+    try {
+      const result = await listArtifactFiles(runId)
+      setArtifactFiles(result.files)
+      const readme = result.files.find(file => /(^|\/)README\.md$/i.test(file.path))
+      if (readme) setOpenedFile(await openArtifactFile(runId, readme.path))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open artifact files')
+    } finally {
+      setArtifactLoading(false)
+    }
+  }
+
+  async function openArtifact(path: string) {
+    if (!runId) return
+    setError(null)
+    try {
+      setOpenedFile(await openArtifactFile(runId, path))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open file')
+    }
+  }
 
   async function handleRetry() {
     if (!runId) return
@@ -97,15 +127,33 @@ export default function ExecutionView() {
             </p>}
             <p className="mt-1 text-xs text-gray-400">Execution {state.artifact.execution_id}</p>
           </div>
-          {state.artifact.status === 'ready' && state.artifact.filename && <button
-            className="rounded bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
-            onClick={() => void downloadExecutionArtifact(runId, state.artifact!.filename!).catch(err => setError(err instanceof Error ? err.message : 'Download failed'))}
-          >Download Polished Repository</button>}
+          {state.artifact.status === 'ready' && state.artifact.filename && <div className="flex gap-2">
+            <button
+              className="rounded bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+              onClick={() => void downloadExecutionArtifact(runId, state.artifact!.filename!).catch(err => setError(err instanceof Error ? err.message : 'Download failed'))}
+            >Download Polished Repository</button>
+            <button
+              className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              disabled={artifactLoading}
+              onClick={() => void loadArtifactFiles()}
+            >{artifactLoading ? 'Opening…' : 'Open Files'}</button>
+          </div>
         </div>
       </section>}
-      <div className="grid gap-4 md:grid-cols-2 mb-6">
+      {artifactFiles.length > 0 && <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="mb-3 text-sm font-semibold">Polished repository files</h2>
+        <div className="grid gap-4 md:grid-cols-[240px_1fr]">
+          <div className="max-h-72 overflow-auto border-r pr-3">
+            {artifactFiles.map(file => <button key={file.path} onClick={() => void openArtifact(file.path)} className="block w-full truncate rounded px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100">{file.path}</button>)}
+          </div>
+          <div>
+            {openedFile ? <><div className="mb-2 text-xs font-medium text-slate-500">{openedFile.path}</div><pre className="max-h-96 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100 whitespace-pre-wrap">{openedFile.content}</pre></> : <p className="text-sm text-slate-400">Select a text file to preview it.</p>}
+          </div>
+        </div>
+      </section>}
+      <div className="grid gap-4 md:grid-cols-2 mb-6>
         <section className="bg-white border border-gray-200 rounded p-4">
-          <h2 className="text-sm font-semibold mb-3">Agent activity</h2>
+          <h2 className="text-sm font-semibold mb-3">Execution event log</h2>
           <div className="space-y-3 max-h-96 overflow-auto">
             {events.length === 0 && <p className="text-sm text-gray-400">Waiting for execution events…</p>}
             {events.map((event, index) => <div key={`${event.timestamp}-${index}`} className="border-l-2 border-blue-200 pl-3">
