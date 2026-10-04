@@ -22,21 +22,9 @@ The core idea is **proof, not just generation**. A useful engineering system sho
 
 ## IBM Bob 2.0 Hackathon
 
-DevForge was created as my project for the **IBM Bob 2.0 Hackathon**. IBM Bob 2.0 was used as the development environment during the build; Bob is not a DevForge runtime dependency.
+DevForge was created as my project for the **IBM Bob 2.0 Hackathon**. IBM Bob 2.0 was the hackathon development environment and build-time AI coding partner used during development; Bob is not a DevForge runtime dependency.
 
-## Why I Did Not Submit a Completed Entry
-
-DevForge was built for the **IBM Bob 2.0 Hackathon**, but I did not submit it as a completed entry because the final end-to-end runtime path was not sufficiently validated before the submission window closed.
-
-The implementation was substantially built and locally validated, but the configured real LLM provider credential was unavailable for the final live execution. That meant I could not honestly demonstrate the complete chain of **real provider response → agent-driven repository change → persisted execution result → live SSE execution → browser-level end-to-end flow → final before/after impact report**.
-
-I could have submitted a polished-looking demo anyway. I chose not to. For an engineering project whose central promise is **verification and evidence**, claiming a fully verified runtime without proving that path would have contradicted the product itself.
-
-The official hackathon submission window is now closed, so this repository is preserved as an **honest engineering prototype and portfolio project**, rather than being presented as a completed competition submission. The hackathon itself ran September 25–27, 2026.
-
-> **The decision was not “the project was bad.” The decision was “the evidence was not strong enough to claim what the product promises.”**
-
-That distinction matters.
+The hackathon submission requirements included a public code repository, demo application, video, presentation, written problem/solution and IBM Bob usage statements, plus evidence of Bob-assisted work such as task-session summary screenshots. DevForge's development process is documented here transparently rather than presenting AI assistance as hidden or manual work.
 
 ## AI-Assisted Development
 
@@ -47,7 +35,37 @@ That distinction matters.
 | **OpenAI Codex** | Independent validation, debugging and repository-level engineering support |
 | **ChatGPT** | Architecture reasoning, debugging, UX planning, documentation and implementation guidance |
 
-These tools helped build and validate the project; they are not DevForge itself.
+These tools supported development; they are not DevForge itself. The product concept, architecture decisions, integration, implementation direction, testing decisions and final ownership remained with me.
+
+## Why I Did Not Submit a Completed Entry
+
+DevForge was built for the **IBM Bob 2.0 Hackathon**, but I did not submit it as a completed entry because the final end-to-end runtime path was not sufficiently validated before the submission window closed.
+
+During the hackathon period, I was also involved in an **accident**, which reduced my available development time and contributed to the missed submission timeline.
+
+The implementation was substantially built and locally validated, but the configured real LLM provider credential was unavailable for the final live execution. That meant I could not honestly demonstrate the complete chain of **real provider response → agent-driven repository change → persisted execution result → live SSE execution → browser-level end-to-end flow → final before/after impact report**.
+
+I could have submitted a polished-looking demo anyway. I chose not to. For an engineering project whose central promise is **verification and evidence**, claiming a fully verified runtime without proving that path would have contradicted the product itself.
+
+The official hackathon submission window is now closed, so this repository is preserved as an **honest engineering prototype and portfolio project**, rather than being presented as a completed competition submission.
+
+> **The decision was not “the project was bad.” The decision was “the evidence was not strong enough to claim what the product promises.”**
+
+That distinction matters.
+
+## Current Limitations
+
+DevForge is an engineering prototype, so it has clear boundaries:
+
+- The real LLM/provider execution path is not fully validated end-to-end.
+- Agent-generated changes still require human review.
+- Repository analysis depends on the project's structure and available engineering signals.
+- Verification only covers the checks configured for the project.
+- The current system is not yet a production-grade multi-tenant platform.
+- Deployment/runtime behavior can differ from local development environments.
+- Impact metrics are only as meaningful as the repository signals and verification commands available to the system.
+
+These limitations are intentionally documented because **verification is the product's core principle**.
 
 ## Core Product
 
