@@ -26,13 +26,17 @@ DevForge was created as my project for the **IBM Bob 2.0 Hackathon**. IBM Bob 2.
 
 ## Why I Did Not Submit a Completed Entry
 
-I chose not to claim a completed submission when the final end-to-end path could not be truthfully validated.
+DevForge was built for the **IBM Bob 2.0 Hackathon**, but I did not submit it as a completed entry because the final end-to-end runtime path was not sufficiently validated before the submission window closed.
 
-The implementation and engineering validation had progressed substantially, but the configured real LLM provider credential was unavailable for the final end-to-end execution. Because of that, I could not honestly prove the complete live path: real provider response, real agent-driven repository modification, persisted live execution result, live SSE execution, browser-level end-to-end execution, and the final before/after impact report generated from that complete run.
+The implementation was substantially built and locally validated, but the configured real LLM provider credential was unavailable for the final live execution. That meant I could not honestly demonstrate the complete chain of **real provider response → agent-driven repository change → persisted execution result → live SSE execution → browser-level end-to-end flow → final before/after impact report**.
 
-The codebase had already been validated with **43 backend tests, Ruff, frontend typecheck/build, and `git diff --check`**. Those checks were valuable, but they were not a substitute for the missing real-provider execution.
+I could have submitted a polished-looking demo anyway. I chose not to. For an engineering project whose central promise is **verification and evidence**, claiming a fully verified runtime without proving that path would have contradicted the product itself.
 
-Rather than submit a demo that implied a fully verified runtime path that had not actually been proven, I kept DevForge as an honest, inspectable engineering build. This README intentionally documents that decision.
+The official hackathon submission window is now closed, so this repository is preserved as an **honest engineering prototype and portfolio project**, rather than being presented as a completed competition submission. The hackathon itself ran September 25–27, 2026. citeturn0search2turn0search4
+
+> **The decision was not “the project was bad.” The decision was “the evidence was not strong enough to claim what the product promises.”**
+
+That distinction matters.
 
 ## AI-Assisted Development
 
