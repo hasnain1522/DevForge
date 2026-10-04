@@ -32,7 +32,7 @@ The implementation was substantially built and locally validated, but the config
 
 I could have submitted a polished-looking demo anyway. I chose not to. For an engineering project whose central promise is **verification and evidence**, claiming a fully verified runtime without proving that path would have contradicted the product itself.
 
-The official hackathon submission window is now closed, so this repository is preserved as an **honest engineering prototype and portfolio project**, rather than being presented as a completed competition submission. The hackathon itself ran September 25–27, 2026. citeturn0search2turn0search4
+The official hackathon submission window is now closed, so this repository is preserved as an **honest engineering prototype and portfolio project**, rather than being presented as a completed competition submission. The hackathon itself ran September 25–27, 2026.
 
 > **The decision was not “the project was bad.” The decision was “the evidence was not strong enough to claim what the product promises.”**
 
