@@ -22,7 +22,11 @@ The core idea is **proof, not just generation**. A useful engineering system sho
 
 ## IBM Bob 2.0 Hackathon
 
-DevForge was created as my project for the **IBM Bob 2.0 Hackathon**. IBM Bob 2.0 was the hackathon development environment and build-time AI coding partner used during development; Bob is not a DevForge runtime dependency.
+DevForge was developed for the **IBM Bob 2.0 Hackathon**. My participation was **individual (solo) and fully online**. IBM Bob 2.0 was the hackathon development environment and build-time AI coding partner used during development; Bob is not a DevForge runtime dependency.
+
+**Participation format:** Online · Solo participant  
+**Project:** DevForge — Agentic AI Engineering Control Center  
+**Outcome:** I did not progress as a selected entry. I also did not submit a completed entry: the final end-to-end runtime path was not sufficiently validated before the submission window closed.
 
 The hackathon submission requirements included a public code repository, demo application, video, presentation, written problem/solution and IBM Bob usage statements, plus evidence of Bob-assisted work such as task-session summary screenshots. DevForge's development process is documented here transparently rather than presenting AI assistance as hidden or manual work.
 
@@ -47,7 +51,7 @@ The implementation was substantially built and locally validated, but the config
 
 I could have submitted a polished-looking demo anyway. I chose not to. For an engineering project whose central promise is **verification and evidence**, claiming a fully verified runtime without proving that path would have contradicted the product itself.
 
-The official hackathon submission window is now closed, so this repository is preserved as an **honest engineering prototype and portfolio project**, rather than being presented as a completed competition submission.
+The official hackathon submission window is now closed. DevForge is preserved as an **honest engineering prototype and portfolio project**, not as a completed competition submission or a finalist project.
 
 > **The decision was not “the project was bad.” The decision was “the evidence was not strong enough to claim what the product promises.”**
 
